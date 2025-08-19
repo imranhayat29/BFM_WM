@@ -606,8 +606,10 @@ class WallModelVisualization:
                error_kw=dict(capsize=5))
         
         # Set y-axis limit
-        ax.set_ylim(0, max(10, max(model_mean + model_std, loglaw_mean + loglaw_std)))
-        
+        # ax.set_ylim(0, max(10, max(model_mean + model_std, loglaw_mean + loglaw_std)))
+        # ax.set_ylim(0, max(10, max(model_mean, loglaw_mean)))  # IH: removed std for better visibility
+        ax.set_ylim(0, 100)  # IH: removed std for better visibility
+
         # Set labels and title
         ax.set_ylabel(rf'Mean relative error (\%)')
         ax.set_title(f'{self.dataset_labels.get(dataset, dataset)}')

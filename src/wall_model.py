@@ -280,7 +280,7 @@ class WallModel(WallModelBase):
         # Store in data handler for consistency
         self.data_handler.input = self.input
         self.data_handler.output = self.output
-        # self.data_handler.flow_type = self.flow_type
+        self.flow_type = self.data_handler.flow_type
         self.data_handler.input_dim = self.input_dim
         
         # Preprocess data

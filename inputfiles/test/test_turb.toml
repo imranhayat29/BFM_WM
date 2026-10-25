@@ -1,0 +1,102 @@
+# A-priori test of the turbulent BFM wall model: baseline + error model + SNGP confidence + EQWM fallback.
+# Defaults reproduce the turbulent-only notebook (TURB-NB, Gaussian bump 2M) with these changes:
+# inference-only gates, magnitudes everywhere, CharLES BFMv2 EQWM law and blend nesting.
+# Run from the repository root:
+#   python test_turb.py test/test_turb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
+# Every key is optional; the values below are the defaults, except [classes]: an omitted PosthocGroups or
+# DisplayNames is taken from the SNGP metadata, which is empty for the shipped models (so removing them loses
+# the groups and names shown there).
+
+[general]
+OutputDir  = "results/test_turb_gaussian_2M"   # Output directory (figures, summary.json, arrays.npz); --output-dir overrides
+Formats    = ["png", "pdf"]                    # Figure formats (png, pdf, svg, jpg, eps)
+GpuNum     = 0                                 # GPU index for torch and TensorFlow (-1 = CPU); --gpu overrides
+SaveArrays = false                             # Also write arrays.npz with every per-point field (predictions, errors, x, n1, ...)
+
+[models]
+# Names under ./models/ (or paths). The SNGP is the ep4000 model that CharLES BFMv2 runs (the lam-turb
+# notebook's turbulent branch); TURB-NB used ..._ep5000_merged, which is also in ./models/.
+Baseline = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Sngp     = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
+Error    = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+
+[data]
+Datasets   = ["gaussian_2M_APG", "gaussian_2M_FPG", "gaussian_2M_SEP", "gaussian_2M_MAPG"]   # Test dataset keys (wall_model_cases.py registry or ./data/<key>_data.h5)
+upy        = 0.15    # Keep n1/delta <= upy (>= 1: no upper cut); 0.15 = the turbulent baseline's training window
+downy      = 0.0     # Keep n1/delta >= downy (0: no lower cut; honoured even when upy >= 1)
+Stride     = 2       # Keep every Stride-th point of each dataset (notebooks: downsample_factor 2)
+MaxSamples = 0       # > 0: deterministic evenly spaced subsample of all points (smoke tests); --max-samples overrides
+
+[data.Files]
+# Optional explicit h5 path per dataset key, e.g.
+# gaussian_2M_SEP = "./data/gaussian_2M_data_SEP.h5"
+
+[eqwm]
+Law = "charles"      # EQWM fallback/comparison: "charles" (CharLES BFMv2 two-layer law, kappa 0.41, B 5.2, y* 11.06)
+                     # or "parent" (notebooks: src/baseline_models.log_law_solve, log law + near-wall cubic below y+ 23)
+
+[confidence]
+Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, = CharLES and the notebooks) or "gp" (per-point GP variance)
+
+[gates]
+# Three smooth switches (linear ramps Threshold +- Delta, CharLES smoothBlend*), nested as in CharLES BFMv2:
+#   y_final = a_nw*(a_c*(a_a*y_corr + (1-a_a)*y_base) + (1-a_c)*y_fallback) + (1-a_nw)*y_fallback
+Aleatoric  = { Type = "percentage", Threshold = 10.0, Delta = 5.0 }   # Correct where sigma% < 10 +- 5 ("ratio" = sigma/|mu|, notebooks 1.0 +- 0.5)
+Confidence = { Threshold = 0.7, Delta = 0.05 }    # Keep the NN where the SNGP confidence C > 0.7 +- 0.05, else EQWM fallback
+Yplus      = { Threshold = 4.0, Delta = 2.0 }     # Keep the NN where y+ (EQWM u_tau) > 4 +- 2, else EQWM fallback
+LowValue   = { Threshold = 2.0, Delta = 1.0 }     # sigma%/mu% = 100 q/|pi_out,baseline|, blended with 100 q/sqrt(|pi_1|) below |pi_out,baseline| 2 +- 1
+
+[metrics]
+LowValue = { Threshold = 2.0, Delta = 1.0 }       # Evaluation % errors: 100 e/|pi_out,true|, blended with 100 e/sqrt(|pi_1|) below |pi_out,true| 2 +- 1
+
+[classes]
+# Post-hoc grouping (class labels and plots only; the confidence always uses the un-merged SNGP classes)
+# and display names. Remove a key to use the SNGP metadata instead (empty for the shipped models).
+PosthocGroups = { "APG TBL" = ["APG", "Curved BL APG"], "FPG TBL" = ["FPG", "NASA Hump FPG", "Curved BL FPG"], "Separation" = ["SEP", "NASA Hump SEP"] }
+DisplayNames  = { CH = "ZPG TBL", FS_ZPG = "Viscous ZPG", FS_APG = "Viscous APG", FS_FPG = "Viscous FPG", transition_JHU_transition = "Transition BL" }
+
+[plots]
+SpatialMaps = true   # Scatter maps over (x, n1/delta): |e%| baseline/corrected/EQWM, |mu%|, sigma%, C, class labels (map_*)
+CfLines     = true   # |C_f| along x at one n1 station per x, raw and moving-averaged (cf_lines, cf_lines_ma)
+Pdfs        = true   # PDFs of |e%| (baseline, corrected, EQWM) and of C (pdf_errors, pdf_confidence)
+Tripcolor   = true   # Smoothed tripcolor maps with OOD / near-wall-fallback hatching (tri_*)
+
+[plots.maps]
+YAxis        = "n1_over_delta"   # y axis: "n1_over_delta" or "n1"
+YLim         = [0.0, 0.2]        # y-axis limits
+RawN1YLim    = [0.0, 0.005]      # y-axis limits of the raw-n1 maps (lam-turb only)
+XLim         = []                # x-axis limits ([] = data range)
+VMin         = 1.0               # Lower limit of the logarithmic colour scales (%)
+VMax         = 100.0             # Upper limit of the logarithmic colour scales (%)
+MarkerSize   = 10.0              # Scatter marker size
+ShowSelected = true              # Overlay the selected n1 stations (red) on the baseline and label maps
+
+[plots.cf_lines]
+Selection     = "raw"            # n1 station per x: "raw" (n1 closest to Value), "normalized" (Value in [0, 1] of the local n1 range),
+                                 # "yplus" (y+ closest to Value; dataset u_tau, plotting only) or "raw_piecewise" (keys below)
+Value         = 0.001            # Target of "raw"/"normalized"/"yplus"
+Upstream      = 0.0002           # "raw_piecewise": target n1 upstream of XTransition
+Downstream    = 0.001            # "raw_piecewise": target n1 downstream of XTransition
+XTransition   = 0.05             # "raw_piecewise": transition x
+RampWidth     = 0.1              # "raw_piecewise": width of the linear ramp between the targets (0 = jump)
+MovingAverage = 50               # Moving-average window in stations (<= 1: none)
+XLim          = [-0.7, 0.41]     # x-axis limits ([] = automatic)
+YLim          = []               # |C_f| axis limits ([] = from 0, top automatic)
+TruthMarkers  = 40               # Number of truth markers, evenly spaced in x (moving-average plot)
+TruthMarkerDx = 0.0              # > 0: one truth marker every TruthMarkerDx in x instead
+
+[plots.pdfs]
+Method    = "kde"                # "kde", "histogram" ("hist") or "both"
+XRange    = [0.0, 40.0]          # |e%| range; KDEs are fitted inside it (densities conditional on |e%| in XRange)
+ConfRange = [0.7, 1.0]           # Confidence range of the confidence PDF
+Bins      = 50                   # Histogram bins
+
+[plots.tripcolor]
+YLim         = [0.01, 0.2]       # n1/delta limits
+XLim         = []                # x limits ([] = data range)
+GridNx       = 600               # Smoothing grid points in x
+GridNy       = 150               # Smoothing grid points in n1/delta
+Sigma        = 3.0               # Gaussian-filter width in grid cells (0 = no smoothing)
+VMin         = 1.0               # Lower limit of the logarithmic colour scales (%)
+VMax         = 100.0             # Upper limit of the logarithmic colour scales (%)
+ShowSelected = true              # Overlay the selected n1 stations on the baseline map

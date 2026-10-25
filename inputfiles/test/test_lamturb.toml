@@ -1,0 +1,120 @@
+# A-priori test of the laminar-turbulent BFM wall model (two branches, Kt/Km hard switch).
+# Defaults reproduce the lam-turb notebook (LT-NB, A-airfoil 2M) with these changes: inference-only
+# gates, magnitudes everywhere, CharLES BFMv2 EQWM law and blend nesting; laminar points fall back to the
+# laminar law tau_w = mu |u1|/y1 (no dp/ds) for both the confidence and the near-wall switch, as CharLES BFMv2.
+# Run from the repository root:
+#   python test_lamturb.py test/test_lamturb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
+# Every key is optional; the values below are the defaults, except [data.Files] (see there) and
+# [turb.classes]/[lam.classes]: an omitted PosthocGroups or DisplayNames is taken from the SNGP metadata,
+# which is empty for the shipped models (so removing them from [turb.classes] loses the groups and names shown
+# there; the empty [lam.classes] values give the same result as omitting them).
+
+[general]
+OutputDir  = "results/test_lamturb"   # Output directory (figures, summary.json, arrays.npz); --output-dir overrides
+Formats    = ["png", "pdf"]           # Figure formats (png, pdf, svg, jpg, eps)
+GpuNum     = 0                        # GPU index for torch and TensorFlow (-1 = CPU); --gpu overrides
+SaveArrays = false                    # Also write arrays.npz with every per-point field (predictions, errors, x, n1, ...)
+
+[switch]
+KtKmThreshold = 0.002   # A point is laminar iff kt_km <= threshold (CharLES KT_KM_THRESHOLD); kt_km from the flow_type
+                        # column 'kt_km', else inferred from the flow name ('laminar'/'fs_' -> 0, 'transition' -> 0.5, else 1)
+
+[turb.models]
+# Turbulent branch (names under ./models/ or paths): the model set that CharLES BFMv2 runs
+Baseline = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Sngp     = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
+Error    = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+
+[turb.classes]
+# Post-hoc grouping (labels and plots only; the confidence always uses the un-merged SNGP classes) and
+# display names. Remove a key to use the SNGP metadata instead (empty for the shipped models).
+PosthocGroups = { "APG TBL" = ["APG", "Curved BL APG"], "FPG TBL" = ["FPG", "NASA Hump FPG", "Curved BL FPG"], "Separation" = ["SEP", "NASA Hump SEP"] }
+DisplayNames  = { CH = "ZPG TBL", FS_ZPG = "Viscous ZPG", FS_APG = "Viscous APG", FS_FPG = "Viscous FPG", transition_JHU_transition = "Transition BL" }
+
+[lam.models]
+# Laminar branch
+Baseline = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
+Sngp     = "sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged"
+Error    = "error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000"
+
+[lam.classes]
+PosthocGroups = {}   # No post-hoc grouping on the laminar side (classes: Laminar ZPG/APG/FPG)
+DisplayNames  = {}   # Identity
+
+[data]
+# Test dataset (LT-NB). NOTE: this file is NOT shipped in ./data/ (data/ holds training data only).
+# It is the full 2D-field A-airfoil 2M extraction (wall-normal profiles from the leading edge to the trailing
+# edge, x/c in [0, 1.01], with the kt_km column) created with the WM_data_creation scripts and kept in the
+# original notebooks repository BFM_WM/data/; [data.Files] below points at it.
+Datasets   = ["aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall"]
+upy        = 1.0     # Keep n1/delta <= upy (>= 1: no upper cut; LT-NB used the full profiles)
+downy      = 0.0     # Keep n1/delta >= downy (0: no lower cut; honoured even when upy >= 1)
+Stride     = 2       # Keep every Stride-th point of each dataset (notebooks: downsample_factor 2)
+MaxSamples = 0       # > 0: deterministic evenly spaced subsample of all points (smoke tests); --max-samples overrides
+
+[data.Files]
+# Explicit h5 path per dataset key (needed for the non-shipped default dataset). Paths are relative to the
+# repository root, where the scripts run: this one is the copy in the BFM_WM fork checked out next to this
+# repository. Edit it if the file lives elsewhere (or place the file in ./data/ and remove the entry).
+aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall = "../BFM_WM/data/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5"
+
+[eqwm]
+Law = "charles"      # EQWM (turbulent fallback and comparison): "charles" (CharLES BFMv2 two-layer law) or "parent" (notebooks' log_law_solve)
+
+[confidence]
+Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, = CharLES and the notebooks) or "gp" (per-point GP variance)
+
+[gates]
+# Same switches for both branches (CharLES BFMv2 nesting); fallback = EQWM on turbulent, laminar law on laminar points
+Aleatoric  = { Type = "percentage", Threshold = 15.0, Delta = 5.0 }   # Correct where sigma% < 15 +- 5 ("ratio" = sigma/|mu|)
+Confidence = { Threshold = 0.85, Delta = 0.1 }    # Keep the NN where C (branch SNGP) > 0.85 +- 0.1, else fallback
+Yplus      = { Threshold = 4.0, Delta = 2.0 }     # Keep the NN where y+ > 4 +- 2 (EQWM u_tau; laminar points: sqrt(|pi_1|)), else fallback
+LowValue   = { Threshold = 2.0, Delta = 1.0 }     # sigma%/mu% = 100 q/|pi_out,baseline|, blended with 100 q/sqrt(|pi_1|) below |pi_out,baseline| 2 +- 1
+
+[metrics]
+LowValue = { Threshold = 2.0, Delta = 1.0 }       # Evaluation % errors: 100 e/|pi_out,true|, blended with 100 e/sqrt(|pi_1|) below |pi_out,true| 2 +- 1
+
+[plots]
+SpatialMaps = true   # Scatter maps over (x/c, n1/delta) and raw-n1 maps of the laminar region (map_*, map_rawn1_*)
+CfLines     = true   # |C_f| along x/c at one n1 station per x, raw and moving-averaged (cf_lines, cf_lines_ma)
+Pdfs        = true   # PDFs of |e%| (baseline, corrected, EQWM) and of C (pdf_errors, pdf_confidence)
+Tripcolor   = true   # Smoothed tripcolor maps with OOD / near-wall-fallback hatching (tri_*)
+
+[plots.maps]
+YAxis        = "n1_over_delta"   # y axis: "n1_over_delta" or "n1"
+YLim         = [0.0, 0.3]        # y-axis limits
+RawN1YLim    = [0.0, 0.005]      # y-axis limits of the raw-n1 maps (thin laminar region near the wall)
+XLim         = []                # x-axis limits ([] = data range)
+VMin         = 1.0               # Lower limit of the logarithmic colour scales (%)
+VMax         = 100.0             # Upper limit of the logarithmic colour scales (%)
+MarkerSize   = 10.0              # Scatter marker size
+ShowSelected = true              # Overlay the selected n1 stations (red) on the baseline and label maps
+
+[plots.cf_lines]
+Selection     = "raw_piecewise"  # n1 station per x: "raw", "normalized", "yplus" (dataset u_tau, plotting only) or "raw_piecewise"
+Value         = 0.001            # Target of "raw"/"normalized"/"yplus"
+Upstream      = 0.0002           # "raw_piecewise": target n1 upstream of XTransition (thin laminar boundary layer)
+Downstream    = 0.001            # "raw_piecewise": target n1 downstream of XTransition
+XTransition   = 0.05             # "raw_piecewise": transition x/c
+RampWidth     = 0.1              # "raw_piecewise": width of the linear ramp between the targets (0 = jump)
+MovingAverage = 20               # Moving-average window in stations (<= 1: none)
+XLim          = [-0.01, 1.0]     # x-axis limits ([] = automatic)
+YLim          = []               # |C_f| axis limits ([] = from 0, top automatic)
+TruthMarkers  = 40               # Number of truth markers, evenly spaced in x (moving-average plot)
+TruthMarkerDx = 0.0              # > 0: one truth marker every TruthMarkerDx in x instead
+
+[plots.pdfs]
+Method    = "kde"                # "kde", "histogram" ("hist") or "both"
+XRange    = [0.0, 100.0]         # |e%| range; KDEs are fitted inside it (densities conditional on |e%| in XRange)
+ConfRange = [0.7, 1.0]           # Confidence range of the confidence PDF
+Bins      = 50                   # Histogram bins
+
+[plots.tripcolor]
+YLim         = [0.01, 0.2]       # n1/delta limits (LT-NB cell 78)
+XLim         = [0.0, 1.0]        # x/c limits ([] = data range)
+GridNx       = 600               # Smoothing grid points in x
+GridNy       = 150               # Smoothing grid points in n1/delta
+Sigma        = 3.0               # Gaussian-filter width in grid cells (0 = no smoothing)
+VMin         = 1.0               # Lower limit of the logarithmic colour scales (%)
+VMax         = 100.0             # Upper limit of the logarithmic colour scales (%)
+ShowSelected = true              # Overlay the selected n1 stations on the baseline map

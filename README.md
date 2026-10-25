@@ -87,9 +87,9 @@ docs/DEVELOPMENT.md      developer notes (see Development notes)
   ```
   A venv only links to its base interpreter. To run batch jobs, build it from a Python 3.11 that also
   exists on the compute nodes (e.g. one loaded with `module load`).
-- On the cluster, the environment already exists: `source <path-to-venv>/bin/activate`.
-  Its base interpreter `/usr/bin/python3.11` exists on the login nodes only, so this works there but not in
-  GPU jobs (see [Running on a GPU node](#running-on-a-gpu-node-slurm)).
+- On the cluster, the environment already exists: `source <path-to-venv>/bin/activate`,
+  on the login nodes and in GPU jobs. Its base interpreter is the shared cluster Python 3.11.6
+  (`module load <python3.11 module>`), which exists on every node.
   For a venv of your own on the cluster, run `unset PYTHONPATH` before creating, filling (`pip install`) and
   activating it: the auto-loaded modules put Python 3.10 packages on `PYTHONPATH`, which shadow the venv's.
   The shared torch-venv's `activate` already does this.
@@ -228,19 +228,17 @@ The scripts use one GPU (`--gpu 0` inside a job). The venv's base interpreter mu
 node. If it does not, `source <venv>/bin/activate && python ...` silently runs another Python, and the job
 fails at the first import (`ModuleNotFoundError: No module named 'numpy'`).
 
-On the cluster, the GPU nodes have only `/usr/bin/python3.9`, so the shared torch-venv cannot be activated there.
-Its packages run with the cluster Python 3.11.6 (the interpreter of `module load <python3.11 module>`,
-same ABI), with the venv's `site-packages` on `PYTHONPATH`. This recipe was verified on P100 nodes with all
-training, test and benchmark scripts. Example job script, submitted from the repository root with `sbatch job.sh`:
+On the cluster, `/usr/bin/python3.11` exists on the login nodes only (the GPU nodes have `/usr/bin/python3.9`), so a
+venv built on it works only there. The shared torch-venv is built on the cluster Python 3.11.6, which every node has;
+activating it in a job works (checked on a P100 node), and the training, test and benchmark scripts ran on P100 nodes
+with this interpreter and these packages. Example job script, submitted from the repository root with `sbatch job.sh`:
 ```bash
 #!/bin/bash
 #SBATCH -A <account> -p <gpu-partition> --gres=gpu:1 -c 8 --mem=48G -t 08:00:00
-VENV=<path-to-venv>
-PY=<cluster python3.11>
-# replaces the PYTHONPATH of the auto-loaded modules, whose Python 3.10 packages would shadow the venv's
-export PYTHONPATH=$VENV/lib/python3.11/site-packages
+# activate also unsets the PYTHONPATH of the auto-loaded modules, whose Python 3.10 packages would shadow the venv's
+source <path-to-venv>/bin/activate
 export OMP_NUM_THREADS=8 TF_NUM_INTRAOP_THREADS=8 TF_NUM_INTEROP_THREADS=2
-"$PY" train_turb.py --sngp sngp/sngp_turb.toml --gpu 0
+python train_turb.py --sngp sngp/sngp_turb.toml --gpu 0
 ```
 
 ## The blended prediction

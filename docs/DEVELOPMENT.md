@@ -632,13 +632,19 @@ above are the part worth keeping.
 
 ### 11.1 Environment on the cluster
 
-- Shared venv: `<path-to-venv>` (Python 3.11, base interpreter
-  `/usr/bin/python3.11`); its `bin/activate` unsets `PYTHONPATH`, because the auto-loaded modules put Python 3.10
-  packages there that shadow the venv's (numpy import error). Build any new venv with `env -u PYTHONPATH`.
-- `/usr/bin/python3.11` exists on the login nodes only; the GPU nodes have `/usr/bin/python3.9`. In jobs, run the
-  venv's packages with the cluster Python 3.11.6 (`module load <python3.11 module>`, same ABI) and
-  `PYTHONPATH=<venv>/lib/python3.11/site-packages` (recipe in the README). The first five GPU jobs (2026-10-25,
-  sourcing the venv) failed with `No module named numpy/torch` for this reason.
+- Shared venv: `<path-to-venv>` (8.5 GB). Its `bin/activate` unsets
+  `PYTHONPATH`, because the auto-loaded modules put Python 3.10 packages there that shadow the venv's (numpy import
+  error). Build any new venv with `env -u PYTHONPATH`.
+- Base interpreter: the shared cluster Python 3.11.6 (`module load <python3.11 module>`), which exists on
+  the login and the GPU nodes. Until 2026-10-25 it was `/usr/bin/python3.11`, which exists on the login nodes only
+  (the GPU nodes have `/usr/bin/python3.9`). The first five GPU jobs therefore failed with `No module named
+  numpy/torch`, and the trainings of [section 12](#12-reproduction-of-the-reference-models-with-v2) ran the venv's
+  packages with the cluster Python through `PYTHONPATH`. The venv was then re-pointed to the cluster Python with
+  `venv --upgrade --without-pip` (packages and `activate` untouched; the changed files are backed up in
+  `<venv backup>/`). Plain `source .../activate` was then checked
+  in a P100 job, and CPU results were bit-identical to those under the old interpreter.
+- If that cluster build ever disappears, re-point the venv to another CPython 3.11 (the compiled packages are cp311):
+  `rm <venv>/bin/python3.11 && <python3.11> -m venv --upgrade --without-pip <venv>`.
 - Login node: limit threads (`OMP_NUM_THREADS=2 TF_NUM_INTRAOP_THREADS=2 TF_NUM_INTEROP_THREADS=1`); keep checks
   light. No Slurm submission without the owner's approval.
 - git-lfs 3.8.1 is in `~/.local/bin`, enabled with `--local` in this repository only.

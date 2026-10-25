@@ -1,16 +1,16 @@
 # Baseline BFM wall model, turbulent (used by both the turbulent-only and the laminar-turbulent workflows).
-# This is the configuration embedded in the shipped checkpoint models/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth
-# (trained from input2_1204_v1new_0.15_0.0025.toml); it includes the laminar Falkner-Skan data FS_*.
+# This is the configuration embedded in the reference checkpoint models/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth
+# (n1/delta window [0.0025, 0.15], as in its name); its training data include the laminar Falkner-Skan sets FS_*.
 # Train with:  python train_wm_proposal.py baseline/baseline_turb.toml
 
 [general]
 # General settings for the project
 Verbose = 1             # Verbosity level (0: quiet, 1: informational, 2: debug)
-UseWandb = false       # Whether to use Weights & Biases for experiment tracking (the shipped checkpoint used true)
+UseWandb = false       # Whether to use Weights & Biases for experiment tracking (the reference checkpoint used true)
 Save = true             # Whether to save trained models
 SaveDir = "./models"    # Directory to save models
 GpuNum = 0              # GPU index (train_wm_proposal.py needs a CUDA GPU; -1/CPU is not supported)
-Seed = 1234             # BFM_WM_v2: seeds the train/valid split and weights (the shipped checkpoint was unseeded)
+Seed = 1234             # Seeds the train/valid split and the weights (the reference checkpoint was trained unseeded)
 # WandbName = "Test_inner_att2_nw2000" # Name for the Weights & Biases run
 
 [data]
@@ -29,7 +29,7 @@ FS_FPG = 1
 
 # Data generation settings
 upy = 0.15             # Upper y value for input as a fraction of delta
-downy = 0.0025             # Upper y value for input as a fraction of delta
+downy = 0.0025             # Lower y value for input as a fraction of delta
 
 # Near-wall filtering
 # near_wall_threshold = 4000

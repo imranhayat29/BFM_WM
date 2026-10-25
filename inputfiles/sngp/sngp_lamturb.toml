@@ -1,6 +1,4 @@
-# SNGP confidence models of the laminar-turbulent BFM wall model (one per branch).
-# Replaces the SNGP cells of BFMWM_ErrorModel copy_aairfoil2M-LamTurbModel-cleaned4context2.ipynb (LT-NB,
-# cells 14-29), which had to be run once per pipeline by hand.
+# SNGP confidence models of the laminar-turbulent BFM wall model (one per branch: laminar and turbulent).
 #
 # Train with (from the repository root):
 #   python train_lamturb.py --sngp sngp/sngp_lamturb.toml [--error error/error_lamturb.toml] [--branch lam|turb|both]
@@ -20,7 +18,7 @@ Seed      = 1234         # seeds splits, weights, shuffling and dropout
 # Laminar branch: laminar baseline (FS_ZPG/APG/FPG) + laminar A-airfoil additional data
 # =====================================================================================================
 [lam.general]
-# Shipped model (models/, read-only), for reference:
+# Reference model (./models/, read-only), for comparison:
 #   sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged
 ModelName = "sngp_model_lam_v2"
 
@@ -28,27 +26,27 @@ ModelName = "sngp_model_lam_v2"
 Checkpoint = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
 
 [lam.data]
-# Laminar A-airfoil regions (h5 case names aairfoil_laminar_{ZPG,APG,FPG}); LT-NB add_datasets for 'lam'
+# Laminar regions of the A-airfoil 2M case (h5 case names aairfoil_laminar_{ZPG,APG,FPG}), n1/delta in [0.02, 0.8]
 AddDatasets = ["aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_ZPG",
                "aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_APG",
                "aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_FPG"]
 TrainRatio = 0.8         # seeded 80/20 split of the additional data
-upy   = 0.8              # n1/delta <= 0.8 (the shipped model's 'UPY0p8' tag)
+upy   = 0.8              # n1/delta <= 0.8 (the reference model's 'UPY0p8' tag)
 downy = 0.0              # no lower cut
-DownsampleBaseline = 10  # every 10th baseline train/valid point (LT-NB downsample_sngp_data_factor = 10)
-RecomputeNorm = true     # z-score stats over (strided baseline + additional) train data (LT-NB recompute_norm_with_extra_flag = 1)
+DownsampleBaseline = 10  # every 10th baseline train/valid point (as for the reference model)
+RecomputeNorm = true     # z-score stats over (strided baseline + additional) train data (as for the reference model)
 
 [lam.data.Files]
 # Optional explicit h5 paths
 
 [lam.classes]
 NumClasses    = 30       # GP output units (CharLES expects 30 for the laminar SNGP)
-RemoveClasses = []       # LT-NB labels_to_remove = [] (laminar)
+RemoveClasses = []       # no class removed
 DisplayNames  = {}       # identity (the class names are already descriptive)
-PosthocGroups = {}       # LT-NB apply_posthoc_merging = False for 'lam'
+PosthocGroups = {}       # no post-hoc grouping
 
 [lam.classes.MergeGroups]
-# LT-NB group_definitions for 'lam' ({0,5}, {1,3}, {2,4}): baseline FS case + airfoil region of the same pressure gradient
+# Each class = baseline Falkner-Skan case + airfoil laminar region of the same pressure gradient
 "Laminar ZPG" = ["FS_ZPG", "aairfoil_laminar_ZPG"]
 "Laminar APG" = ["FS_APG", "aairfoil_laminar_APG"]
 "Laminar FPG" = ["FS_FPG", "aairfoil_laminar_FPG"]
@@ -60,21 +58,21 @@ SpecNormBound = 0.9
 NumInducing   = 1024
 GpKernelScale = 1.0
 Dropout       = 0.1
-DropoutActive = true     # false reproduces the shipped models (dropout never applied)
+DropoutActive = true     # false reproduces the reference models (dropout never applied)
 
 [lam.training]
-Epochs          = 20000      # LT-NB epochs for 'lam'
+Epochs          = 20000      # epochs of the laminar reference model (ep20000)
 BatchSize       = 50000
 LearningRate    = 5.0e-4
 EndLearningRate = 1.0e-4
-DecayUnit       = "epoch"    # "step" reproduces the shipped models
+DecayUnit       = "epoch"    # "step" reproduces the reference models
 ClassWeights    = "balanced"
 
 # =====================================================================================================
-# Turbulent branch: same recipe as sngp/sngp_turb.toml, 4000 epochs (the SNGP used by CharLES BFMv2)
+# Turbulent branch: same recipe as sngp/sngp_turb.toml, 4000 epochs (the SNGP deployed in CharLES BFMv2)
 # =====================================================================================================
 [turb.general]
-# Shipped model (models/, read-only), for reference:
+# Reference model (./models/, read-only), for comparison:
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged
 ModelName = "sngp_model_lamturb_turb_v2"
 
@@ -88,8 +86,8 @@ AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hum
 TrainRatio = 0.8
 upy   = 0.15             # n1/delta <= 0.15 (checkpoint upy)
 downy = 0.0
-DownsampleBaseline = 1   # no stride (LT-NB 'turb')
-RecomputeNorm = false    # full baseline-train statistics (LT-NB 'turb')
+DownsampleBaseline = 1   # no stride
+RecomputeNorm = false    # full baseline-train statistics
 
 [turb.data.Files]
 
@@ -135,7 +133,7 @@ Dropout       = 0.1
 DropoutActive = true
 
 [turb.training]
-Epochs          = 4000       # LT-NB epochs for 'turb'
+Epochs          = 4000       # 4000 = the reference turbulent SNGP deployed in CharLES BFMv2
 BatchSize       = 50000
 LearningRate    = 5.0e-4
 EndLearningRate = 1.0e-4

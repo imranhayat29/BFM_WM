@@ -1,4 +1,5 @@
-# config.toml
+# Example configuration of the baseline wall model (upstream).
+# Train with:  python train_wm_proposal.py input2_example.toml
 
 [general]
 # General settings for the project

@@ -1,12 +1,14 @@
-# A-priori test of the laminar-turbulent BFM wall model (two branches, Kt/Km hard switch).
-# Defaults reproduce the lam-turb notebook (LT-NB, A-airfoil 2M) with these changes: inference-only
-# gates, magnitudes everywhere, CharLES BFMv2 EQWM law; laminar points fall back to the
-# laminar law tau_w = mu |u1|/y1 (no dp/ds) for both the confidence and the near-wall switch, as CharLES BFMv2.
+# A-priori test of the laminar-turbulent BFM wall model: a laminar and a turbulent branch (each baseline + error
+# model + SNGP confidence), selected per point by a hard switch on the laminar-turbulent sensor Kt/Km.
+# Default test case: the full 2D field of the A-airfoil 2M case (see [data]).
+# The gates use inference-time information only (never the dataset truth) and errors are compared as magnitudes.
+# Fallbacks, as in CharLES BFMv2: the EQWM (equilibrium wall model) on turbulent points and the laminar law
+# tau_w = mu |u1|/y1 (no dp/ds) on laminar points, for both the confidence and the near-wall switch.
 # Run from the repository root:
 #   python test_lamturb.py test/test_lamturb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
 # Every key is optional; the values below are the defaults, except [data.Files] (see there) and
 # [turb.classes]/[lam.classes]: an omitted PosthocGroups or DisplayNames is taken from the SNGP metadata,
-# which is empty for the shipped models (so removing them from [turb.classes] loses the groups and names shown
+# which is empty for the reference models (so removing them from [turb.classes] loses the groups and names shown
 # there; the empty [lam.classes] values give the same result as omitting them).
 
 [general]
@@ -20,19 +22,19 @@ KtKmThreshold = 0.002   # A point is laminar iff kt_km <= threshold (CharLES KT_
                         # column 'kt_km', else inferred from the flow name ('laminar'/'fs_' -> 0, 'transition' -> 0.5, else 1)
 
 [turb.models]
-# Turbulent branch (names under ./models/ or paths): the model set that CharLES BFMv2 runs
+# Turbulent branch (names under ./models/ or paths): the reference turbulent models that CharLES BFMv2 runs
 Baseline = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 Sngp     = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
 Error    = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
 
 [turb.classes]
 # Post-hoc grouping (labels and plots only; the confidence always uses the un-merged SNGP classes) and
-# display names. Remove a key to use the SNGP metadata instead (empty for the shipped models).
+# display names. Remove a key to use the SNGP metadata instead (empty for the reference models).
 PosthocGroups = { "APG TBL" = ["APG", "Curved BL APG"], "FPG TBL" = ["FPG", "NASA Hump FPG", "Curved BL FPG"], "Separation" = ["SEP", "NASA Hump SEP"] }
 DisplayNames  = { CH = "ZPG TBL", FS_ZPG = "Viscous ZPG", FS_APG = "Viscous APG", FS_FPG = "Viscous FPG", transition_JHU_transition = "Transition BL" }
 
 [lam.models]
-# Laminar branch
+# Laminar branch: the reference laminar models
 Baseline = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
 Sngp     = "sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged"
 Error    = "error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000"
@@ -42,32 +44,30 @@ PosthocGroups = {}   # No post-hoc grouping on the laminar side (classes: Lamina
 DisplayNames  = {}   # Identity
 
 [data]
-# Test dataset (LT-NB). NOTE: this file is NOT shipped in ./data/ (data/ holds training data only).
-# It is the full 2D-field A-airfoil 2M extraction (wall-normal profiles from the leading edge to the trailing
-# edge, x/c in [0, 1.01], with the kt_km column) created with the WM_data_creation scripts and kept in the
-# original notebooks repository BFM_WM/data/; [data.Files] below points at it.
+# Test dataset: the full 2D-field extraction of the A-airfoil 2M case (wall-normal profiles from the leading edge
+# to the trailing edge, x/c in [0, 1.01], with the kt_km column). It is NOT included in the repository (./data/
+# holds training data only); [data.Files] below gives its location.
 Datasets   = ["aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall"]
-upy        = 1.0     # Keep n1/delta <= upy (>= 1: no upper cut; LT-NB used the full profiles)
+upy        = 1.0     # Keep n1/delta <= upy (>= 1: no upper cut, i.e. the full profiles)
 downy      = 0.0     # Keep n1/delta >= downy (0: no lower cut; honoured even when upy >= 1)
-Stride     = 2       # Keep every Stride-th point of each dataset (notebooks: downsample_factor 2)
+Stride     = 2       # Keep every Stride-th point of each dataset (1 = all points)
 MaxSamples = 0       # > 0: deterministic evenly spaced subsample of all points (smoke tests); --max-samples overrides
 
 [data.Files]
-# Explicit h5 path per dataset key (needed for the non-shipped default dataset). Paths are relative to the
-# repository root, where the scripts run: this one is the copy in the BFM_WM fork checked out next to this
-# repository (untracked there; on the cluster: <local clone of BFM_WM>/data/).
-# Edit it if the file lives elsewhere (or place the file in ./data/ and remove the entry).
-aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall = "../BFM_WM/data/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5"
+# Explicit h5 path per dataset key (absolute, or relative to the repository root, where the scripts run).
+# The lam-turb test set is not included in the repository; the path below is its location on the cluster.
+# Elsewhere, edit the path, or place the file in ./data/ and remove the entry.
+aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall = "/path/to/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5"
 
 [eqwm]
-Law = "charles"      # EQWM (turbulent fallback and comparison): "charles" (CharLES BFMv2 two-layer law) or "parent" (notebooks' log_law_solve)
+Law = "charles"      # EQWM (turbulent fallback and comparison): "charles" (CharLES BFMv2 two-layer law) or "parent" (upstream's log_law_solve)
 
 [confidence]
-Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, = CharLES and the notebooks) or "gp" (per-point GP variance)
+Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, as in CharLES BFMv2) or "gp" (per-point GP variance)
 
 [gates]
 # Same switches for both branches (CharLES BFMv2 nesting); fallback = EQWM on turbulent, laminar law on laminar points
-Aleatoric  = { Type = "percentage", Threshold = 15.0, Delta = 5.0 }   # Correct where sigma% < 15 +- 5 ("ratio" = sigma/|mu|: also set Threshold 1.0, Delta 0.5 as the notebooks)
+Aleatoric  = { Type = "percentage", Threshold = 15.0, Delta = 5.0 }   # Correct where sigma% < 15 +- 5 ("ratio" = sigma/|mu|: then set Threshold 1.0, Delta 0.5, or omit both to get these ratio defaults)
 Confidence = { Threshold = 0.85, Delta = 0.1 }    # Keep the NN where C (branch SNGP) > 0.85 +- 0.1, else fallback
 Yplus      = { Threshold = 4.0, Delta = 2.0 }     # Keep the NN where y+ > 4 +- 2 (EQWM u_tau; laminar points: sqrt(|pi_1|)), else fallback
 LowValue   = { Threshold = 2.0, Delta = 1.0 }     # sigma%/mu% = 100 q/|pi_out,baseline|, blended with 100 q/sqrt(|pi_1|) below |pi_out,baseline| 2 +- 1
@@ -111,7 +111,7 @@ ConfRange = [0.7, 1.0]           # Confidence range of the confidence PDF
 Bins      = 50                   # Histogram bins
 
 [plots.tripcolor]
-YLim         = [0.01, 0.2]       # n1/delta limits (LT-NB cell 78)
+YLim         = [0.01, 0.2]       # n1/delta limits
 XLim         = [0.0, 1.0]        # x/c limits ([] = data range)
 GridNx       = 600               # Smoothing grid points in x
 GridNy       = 150               # Smoothing grid points in n1/delta

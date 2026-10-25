@@ -148,7 +148,7 @@ To migrate from the old monolithic class to the new modular design:
 
 ## BFM_WM_v2 changes to this package
 
-The fork changes these behaviours relative to upstream. Each change is also marked with a
+This repository (BFM_WM_v2) changes these behaviours relative to upstream. Each change is also marked with a
 `BFM_WM_v2:` comment in the code.
 - `data_handler.py`:
   - The default `downy` is 0.0 (upstream 0.005) in both `_load_from_raw_sources` and

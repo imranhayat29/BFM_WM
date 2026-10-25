@@ -1,6 +1,4 @@
-# Error models of the laminar-turbulent BFM wall model (one per branch).
-# Replaces the error-model cells of BFMWM_ErrorModel copy_aairfoil2M-LamTurbModel-cleaned4context2.ipynb (LT-NB,
-# cells 34-42), which had to be run once per pipeline by hand.
+# Error models of the laminar-turbulent BFM wall model (one per branch: laminar and turbulent).
 #
 # Train with (from the repository root):
 #   python train_lamturb.py --error error/error_lamturb.toml [--sngp sngp/sngp_lamturb.toml] [--branch lam|turb|both]
@@ -20,7 +18,7 @@ Seed      = 1234         # seeds splits, weights and shuffling
 # Laminar branch
 # =====================================================================================================
 [lam.general]
-# Shipped model (models/, read-only), for reference:
+# Reference model (./models/, read-only), for comparison:
 #   error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000
 ModelName = "error_model_lam_v2"
 
@@ -28,7 +26,7 @@ ModelName = "error_model_lam_v2"
 Checkpoint = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
 
 [lam.data]
-# Laminar A-airfoil extraction up to n1/delta = 1 (from 0.005): the data of the shipped model ('UPY1' in its
+# Laminar regions of the A-airfoil 2M case, n1/delta in [0.005, 1]: the data of the reference model ('UPY1' in its
 # name). Its normalisation statistics match these files. The laminar SNGP uses the narrower
 # down0p02_up0p8 extraction instead (sngp/sngp_lamturb.toml).
 AddDatasets = ["aairfoil_2M_full2Dfield_down0p005_up1_laminar_ZPG",
@@ -45,7 +43,7 @@ HiddenLayers = [60, 60, 60, 60, 60, 60]   # 6 x 60 (CharLES hard-codes 6 hidden 
 SigmaFloor   = 1.0e-4
 
 [lam.training]
-Epochs          = 4000       # LT-NB epochs for 'lam' (shipped: best epoch 3985 of 4000, restored)
+Epochs          = 4000       # epochs of the laminar reference model (its weights: best epoch 3985 of 4000, restored)
 BatchSize       = 50000
 LearningRate    = 1.0e-3
 EndLearningRate = 8.0e-5
@@ -63,7 +61,7 @@ SaveInterval = 1000          # SavedModel every N epochs in <SaveDir>/checkpoint
 # Turbulent branch: same recipe as error/error_turb.toml
 # =====================================================================================================
 [turb.general]
-# Shipped model (models/, read-only), for reference:
+# Reference model (./models/, read-only), for comparison:
 #   error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811
 ModelName = "error_model_lamturb_turb_v2"
 
@@ -85,7 +83,7 @@ HiddenLayers = [60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60]   # 
 SigmaFloor   = 1.0e-4
 
 [turb.training]
-Epochs          = 10000      # shipped 'ep3811' = best epoch of a 10000-epoch run
+Epochs          = 10000      # reference 'ep3811' = best epoch of a 10000-epoch run
 BatchSize       = 50000
 LearningRate    = 1.0e-3
 EndLearningRate = 8.0e-5

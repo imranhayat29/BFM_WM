@@ -1,6 +1,6 @@
-# Error model of the turbulent-only BFM wall model: a Gaussian NLL regressor of the baseline error
-# eps = pi_out,true - pi_out,baseline (raw baseline output), giving the correction mean mu and the aleatoric sigma.
-# Replaces the error-model cells of BFMWM_ErrorModel copy_gaussian2M_cleaned4context.ipynb (TURB-NB, cells 30-35).
+# Error model of the turbulent-only BFM wall model: a regressor of the baseline error
+# eps = pi_out,true - pi_out,baseline (raw baseline output), trained with the Gaussian negative log-likelihood (NLL);
+# it predicts the correction mean mu and the aleatoric (data) uncertainty sigma.
 #
 # Train with (from the repository root):
 #   python train_turb.py --error error/error_turb.toml [--sngp sngp/sngp_turb.toml] [--gpu N] [--smoke]
@@ -10,12 +10,12 @@
 # the statistics are saved as assets/error_norm_stats.json (legacy format read by the exporters and CharLES tools).
 
 [general]
-# Output directory name under SaveDir (required). Shipped model (models/, read-only), for reference:
+# Output directory name under SaveDir (required). Reference model (./models/, read-only), for comparison:
 #   error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811
 #   ('ep3811' = best validation epoch of a 10000-epoch run, restored at the end of training)
 ModelName = "error_model_turb_v2"
 SaveDir   = "./models"   # directory receiving <ModelName>/ (SavedModel + assets/) and checkpoints/<ModelName>/ (snapshots)
-Save      = true         # false: train and write diagnostics only (notebook flag save_flag)
+Save      = true         # false: train and write diagnostics only
 Overwrite = false        # true: replace an existing <SaveDir>/<ModelName> and its snapshots
 GpuNum    = 0            # GPU index for TensorFlow and torch; -1 = CPU (the CLI option --gpu overrides it)
 Seed      = 1234         # seeds the splits, weight initialisation and shuffling (required)
@@ -26,28 +26,29 @@ Seed      = 1234         # seeds the splits, weight initialisation and shuffling
 Checkpoint = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 
 [data]
-# Additional datasets added to the error-model training data (TURB-NB add_datasets, "Expert ExtFlow"). [] = none.
+# Additional datasets added to the error-model training data. [] = none. The list below is the external-flow
+# set of the reference model ('ExpertExtFlow' in its name).
 AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",
                "hump_APG_SEP2", "naca_0012", "naca_4412_1", "naca_4412_2", "naca_4412_4", "naca_4412_10",
                "aairfoil_2M"]
 TrainRatio = 0.8         # fraction of the additional-data points in the train part (seeded 80/20 split)
-upy   = 0.15             # n1/delta <= upy for the additional datasets (>= 1: no upper cut); TURB-NB: checkpoint upy
-downy = 0.0              # n1/delta >= downy (honoured whenever > 0); TURB-NB set downy = 0
+upy   = 0.15             # n1/delta <= upy for the additional datasets (>= 1: no upper cut); 0.15 = the checkpoint's upy
+downy = 0.0              # n1/delta >= downy (honoured whenever > 0); 0 = no lower cut
 
 [data.Files]
 # Optional explicit h5 paths for dataset keys not found in ./data
 
 [model]
-HiddenLayers = [60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60]   # 15 x 60 ReLU layers (required;
-                         # notebook custom_err_hidden_layers). CharLES hard-codes width 60 and 15 (turb) / 6 (lam) layers.
+HiddenLayers = [60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60]   # 15 x 60 ReLU layers (required).
+                         # CharLES hard-codes width 60 and 15 (turb) / 6 (lam) layers.
 SigmaFloor   = 1.0e-4    # sigma = SigmaFloor + softplus(o2) (CharLES hard-codes 1e-4)
 
 [training]
-Epochs          = 10000      # epochs (required). The shipped 'ep3811' model is the best epoch of a 10000-epoch run.
+Epochs          = 10000      # epochs (required). The reference 'ep3811' model is the best epoch of a 10000-epoch run.
 BatchSize       = 50000      # samples per step
 LearningRate    = 1.0e-3     # Adam learning rate at epoch 1 ...
 EndLearningRate = 8.0e-5     # ... decaying linearly per epoch to this value ...
-DecayFraction   = 0.6666667  # ... over this fraction of Epochs (notebooks: decay_steps = epochs/1.5), then constant
+DecayFraction   = 0.6666667  # ... over this fraction of Epochs (2/3, as for the reference models), then constant
 
 [training.EarlyStopping]
 RestoreBestWeights = true    # keep the weights of the best val_loss epoch (tf_keras restores them at the end of
@@ -57,4 +58,3 @@ MinDelta = 0.0               # minimum val_loss decrease counted as an improveme
 
 [training.Snapshots]
 SaveInterval = 1000          # full SavedModel every N epochs in <SaveDir>/checkpoints/<ModelName>/ckpt_XXXX; 0 = off
-                             # (notebook SaveEveryNEpochs / scheduler.SaveInterval)

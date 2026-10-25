@@ -12,3 +12,5 @@ dummy/
 dummy
 apost/
 apost
+# Local developer files (not versioned): e.g. docs/dev_local/inputfiles_annotated, see docs/DEVELOPMENT.md
+docs/dev_local/

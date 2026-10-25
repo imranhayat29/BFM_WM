@@ -1,0 +1,156 @@
+# Multi-dataset a-priori benchmark of the turbulent BFM wall model (baseline + error model + SNGP confidence
+# + EQWM fallback), after the Error_vs_baseline_plotting notebooks (EVB, log-log and AIAA variants).
+# Every dataset goes through the turbulent pipeline of test_turb.py (src_err/pipeline.predict_turb), including the
+# laminar/transitional ones (no Kt/Km switch here). One marker per case in the scatter figures: mean |e%| of the
+# baseline vs mean |e%| of the blended (expert) model.
+# Run from the repository root:
+#   python tools/apriori_benchmark.py benchmark/apriori_benchmark.toml [--gpu N] [--output-dir DIR]
+#          [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both]
+#   python tools/apriori_benchmark.py [benchmark/apriori_benchmark.toml] --replot RUN_DIR [--scale log]
+# This file is self-contained (no inheritance from test_turb.toml): model paths and gate thresholds are repeated
+# here with the same defaults. Only [data].Datasets is required; every other value shown is the default, except
+# [data].TrainingDatasets, [groups] and [display_names] (default: empty).
+
+[general]
+RunName   = "apriori_benchmark"              # File-name stem of the figures: <RunName>_<figure>[_log].<fmt>
+OutputDir = "results/apriori_benchmark"      # Output directory (cases.csv, overall.json, points.npz, figures); --output-dir overrides
+Formats   = ["pdf", "png"]                   # Figure formats (png, pdf, svg, jpg, eps)
+GpuNum    = 0                                # GPU index for torch and TensorFlow (-1 = CPU); --gpu overrides
+
+[models]
+# Names under ./models/ (or paths). Same model set as test_turb.toml (the one CharLES BFMv2 runs). EVB used the
+# SNGP ..._ep3500_merged (11 trained classes), which is not shipped with v2.
+Baseline = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Sngp     = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
+Error    = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+
+[data]
+# Evaluated dataset keys (wall_model_cases.py registry, ./data/<key>_data.h5, or [data.Files]); one case each,
+# except the members of a [groups] entry, which are pooled into that group's case.
+# EVB's 75 keys, with these fixes:
+#   - 'gaussian_2M' (= gaussian_2M_data_ALL.h5, x <= 0.099, no SEP region) is replaced by the 4 subsets the
+#     baseline trained on, pooled into the group "Gaussian bump 2M" below;
+#   - 'Transition_transition' (the transition region of the JHU case, the class the error model and SNGP
+#     trained on) is evaluated next to the full 'Transition' case, so that it can carry the training role;
+#   - 'hump_APG_SEP2' (an error-model/SNGP training set missing in EVB) is added.
+Datasets = [
+    # Test datasets
+    "gaussian_1M", "backstep_inc", "swept_wing", "diffuser", "CH_rot",
+    "TBL_Volino_1", "TBL_Volino_2", "TBL_Volino_3", "TBL_Volino_4",
+    "TBL_Volino_5", "TBL_Volino_6", "TBL_Volino_7", "TBL_Volino_8",
+    "spinning_Driver_as1", "spinning_Driver_cs1", "spinning_Driver_cs0", "spinning_Driver_ds0", "spinning_Driver_ds1",
+    "transition_Coupland_t3a", "transition_Coupland_t3b", "transition_Coupland_t3c1", "transition_Coupland_t3c2",
+    "transition_Coupland_t3c3", "transition_Coupland_t3c4", "transition_Coupland_t3c5",
+    "strained_TBL_z-150", "strained_TBL_z-100", "strained_TBL_z0",
+    "PIPE", "duct", "backstep", "ph_B", "bend", "convdiv", "round_step", "smoothramp", "axissym_BL",
+    "apg_b1n", "apg_b2n", "apg_m13n", "apg_m16n", "apg_m18n",
+    "bub_A", "bub_B", "bub_C", "bub_C35",
+    "TBL_Gungor_2016", "TBL_Gungor_2022", "TBL_Gungor_2023",
+    # External-flow expert sets (error-model / SNGP training extras)
+    "curved_TBL_APG", "curved_TBL_FPG", "Transition", "Transition_transition", "naca_0012",
+    "hump_FPG", "hump_FPG_SEP", "hump_APG_SEP2",
+    "naca_4412_10", "naca_4412_4", "naca_4412_2", "naca_4412_1", "aairfoil_2M",
+    # Baseline training sets
+    "CH", "SYN", "TBL_-4", "TBL_-3", "TBL_-2", "TBL_-1", "TBL_5", "TBL_10", "TBL_15", "TBL_20",
+    "FS_ZPG", "FS_FPG", "FS_APG", "bub_K",
+    "gaussian_2M_APG", "gaussian_2M_FPG", "gaussian_2M_SEP", "gaussian_2M_MAPG",
+]
+# Keys (or group names) plotted with the "training" colour (blue); all other cases are "untrained" (maroon).
+# EVB's 26 keys with the same fixes ('gaussian_2M' -> the 4 subsets, 'Transition' -> 'Transition_transition',
+# + 'hump_APG_SEP2'). A group takes the role of its members.
+TrainingDatasets = [
+    "CH", "SYN", "TBL_-4", "TBL_-3", "TBL_-2", "TBL_-1", "TBL_5", "TBL_10", "TBL_15", "TBL_20",
+    "FS_ZPG", "FS_FPG", "FS_APG", "bub_K",
+    "gaussian_2M_APG", "gaussian_2M_FPG", "gaussian_2M_SEP", "gaussian_2M_MAPG",
+    "curved_TBL_APG", "curved_TBL_FPG", "Transition_transition", "naca_0012",
+    "hump_FPG", "hump_FPG_SEP", "hump_APG_SEP2",
+    "naca_4412_10", "naca_4412_4", "naca_4412_2", "naca_4412_1", "aairfoil_2M",
+]
+upy    = 0.15     # Keep n1/delta <= upy (>= 1: no upper cut). EVB used the turbulent checkpoint's window [0.0025, 0.15]
+downy  = 0.0025   # Keep n1/delta >= downy (0: no lower cut)
+Stride = 1        # Keep every Stride-th point of each dataset
+MaxSamplesPerDataset = 0   # > 0: deterministic evenly spaced subsample per dataset, after the domain filter; --max-samples overrides
+
+[data.Files]
+# Optional explicit h5 path per dataset key, e.g.
+# gaussian_2M_SEP = "./data/gaussian_2M_data_SEP.h5"
+
+[groups]
+# Pooled cases: the members' points (after all filters) are pooled into one case named by the group; the members
+# are not plotted individually (their rows stay in cases.csv with kind = "member"). Members must be in Datasets;
+# with --datasets, a group is formed from the members that were selected.
+"Gaussian bump 2M" = ["gaussian_2M_APG", "gaussian_2M_FPG", "gaussian_2M_SEP", "gaussian_2M_MAPG"]
+
+[display_names]
+# Dataset key -> display name (console table, cases.csv, figure marker lookup). EVB RENAME_MAPPING, verbatim;
+# keys that match no evaluated dataset (e.g. 'hump', 'transition_JHU', 'spinning_Driver') are ignored.
+gaussian_2M_APG  = "APG (2M)"
+gaussian_2M_FPG  = "FPG (2M)"
+gaussian_2M_SEP  = "SEP (2M)"
+gaussian_2M_MAPG = "MAPG (2M)"
+FS_ZPG           = "Falkner Skan (ZPG)"
+FS_APG           = "Falkner Skan (APG)"
+FS_FPG           = "Falkner Skan (FPG)"
+CH               = "Channel Flow"
+SYN              = "Synthetic Log Law"
+round_step       = "Round Step"
+CH_rot           = "Rotational Channel"
+Stokes2          = "Stokes flow (2nd)"
+convdiv          = "Conv-Diverge Channel"
+swept_wing       = "Swept Wing"
+smoothramp       = "Smooth Ramp"
+axissym_BL       = "Axisymmetric BL"
+APG_Gasser       = "APG TBL (Gasser)"
+hump             = "NASA Hump"
+OscPipe          = "Oscillating pipe"
+transition_JHU   = "Transitional BL (Lee et al.)"
+spinning_Driver  = "3D TBL (Spinning)"
+ph_B             = "Periodic Hill (Balakumar)"
+
+[eqwm]
+Law = "charles"      # EQWM fallback/comparison: "charles" (CharLES BFMv2 two-layer law, kappa 0.41, B 5.2, y* 11.06)
+                     # or "parent" (notebooks: src/baseline_models.log_law_solve)
+
+[confidence]
+Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, = CharLES) or "gp" (per-point GP variance)
+
+[gates]
+# Three smooth switches (linear ramps Threshold +- Delta, CharLES smoothBlend*), nested as in CharLES BFMv2:
+#   y_final = a_nw*(a_c*(a_a*y_corr + (1-a_a)*y_base) + (1-a_c)*y_eqwm) + (1-a_nw)*y_eqwm
+# All gate quantities are inference-only (no dataset target or dataset u_tau).
+Aleatoric  = { Type = "percentage", Threshold = 10.0, Delta = 5.0 }   # Correct where sigma% < 10 +- 5 ("ratio" = sigma/|mu|, notebooks 1.0 +- 0.5)
+Confidence = { Threshold = 0.7, Delta = 0.05 }    # Keep the NN where the SNGP confidence C > 0.7 +- 0.05, else EQWM fallback
+Yplus      = { Threshold = 4.0, Delta = 2.0 }     # Keep the NN where y+ (from the EQWM u_tau) > 4 +- 2, else EQWM fallback
+LowValue   = { Threshold = 2.0, Delta = 1.0 }     # sigma% = 100 sigma/|pi_out,baseline|, blended with 100 sigma/sqrt(|pi_1|) below |pi_out,baseline| 2 +- 1
+
+[metrics]
+LowValue = { Threshold = 2.0, Delta = 1.0 }       # Evaluation % errors: 100 e/|pi_out,true|, blended with 100 e/sqrt(|pi_1|) below |pi_out,true| 2 +- 1
+
+[evaluation]
+# Evaluation-only point selection (the dataset truth selects evaluation points; it never enters a prediction).
+DomainFilter = "retau"           # "retau": keep |u_tau*delta/nu| > RetauMin (EVB Retau_thresh) | "piout": keep |pi_out,true| >= PioutMin | "none"
+RetauMin     = 5.0               # Minimum |u_tau*delta/nu| of the "retau" filter (0 disables)
+PioutMin     = 2.0               # Minimum |pi_out,true| of the "piout" filter (0 disables)
+OutlierPercent = 10000.0         # Joint outlier mask: drop a point if any of |e_base%|, |e_final%|, |e_eqwm%| exceeds it (EVB ERROR_THRESHOLD_PERCENT)
+MinErrorChangePercent = 0.0      # > 0: keep only points with ||e_final%| - |e_base%|| > value (EVB thresh_err_change 0.1; biased, off by default)
+CompareAlways = true             # Also report the always-corrected prediction (|y_b,raw + mu| everywhere; same pass) and plot pdf_always_vs_blended
+
+[plots]
+Scale        = "both"            # Scatter axes: "linear", "log" (LOG notebook) or "both"; --scale overrides
+LinearLimits = [-0.5, 50.0]      # Linear scatter limits (x and y)
+ZoomLimits   = [0.0, 10.0]       # Zoomed scatter (train_test_zoom) limits, also drawn as a dash-dot box on train_test (linear only)
+LogLimits    = [0.1, 100.0]      # Log-log scatter limits; an entry <= 0 = automatic from the positive data
+LogYLimits   = []                # Separate log-log y limits ([] = LogLimits)
+YLabel       = "Expert Model Error (%)"   # Scatter y label (AIAA: "Corrected Prediction Error (%)")
+Legend       = true              # Training / Untrained / Same Performance legend on train_test
+SigmaColorRange      = [0.0, 30.0]   # Colour range of the sigma%-coloured scatter (mean sigma% per case)
+ConfidenceColorRange = [0.8, 1.0]    # Colour range of the confidence-coloured scatter (mean C per case)
+# Figures: train_test (F1, + _log), train_test_zoom (F2, linear only), sigma (F3), confidence (F4),
+# pdf (error PDF + confidence PDF), pdf_always_vs_blended (needs CompareAlways)
+Figures = ["train_test", "train_test_zoom", "sigma", "confidence", "pdf", "pdf_always_vs_blended"]
+PdfMethod     = "kde"            # "kde", "histogram" ("hist") or "both"
+PdfErrorRange = [0.0, 40.0]      # |e%| range; KDEs are fitted inside it (densities conditional on |e%| in the range)
+PdfConfRange  = [0.7, 1.0]       # Range of the confidence PDF
+PdfBins       = 50               # Histogram bins
+PdfCurves     = ["baseline", "final"]   # Error-PDF curves: "baseline", "final" (blended), optional "eqwm", "always"
+PdfSubset     = "all"            # Points pooled into the PDFs: "all" (EVB), "train" or "test" cases only

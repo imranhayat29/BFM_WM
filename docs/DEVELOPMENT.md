@@ -68,6 +68,9 @@ a-posteriori class import, ...) were not ported. To read a notebook as a script:
   | `f65de67` | CharLES exporters and the a-priori benchmark |
   | `5eb44fb` | README and requirements |
   | `c459004` | Final-review fixes (single baseline-output helper, consistent model checks, docs); last commit whose TOMLs carry the notebook pointers |
+  | `9acf1e8` | User docs for fresh users (no notebook references); this file; absolute path of the lam-turb test set |
+
+  Later commits: `git log upstream/master..v2`.
 
 - To follow upstream: `git fetch upstream && git merge upstream/master` on `v2`. Parent files were changed as
   little as possible (D4) so that this stays easy; every change is marked `# BFM_WM_v2:` (see [11.4](#114-conventions)).
@@ -600,11 +603,12 @@ v2's data pipeline against the stored statistics of the reference models (curren
 | Model | v2 | Reference |
 |---|---|---|
 | turbulent SNGP input mean (`mean_X_train`, baseline train part) | [990.2, 8.29, 1261.9] | [993.4, 8.31, 1265.3] |
-| turbulent error model x_mean[0] / error mean / error std | 981.25 / 0.429 / 38.99 | 982.57 / 0.442 / 39.32 |
+| turbulent error model x_mean[0] / error mean / error std (v2 training, seeded split) | 981.08 / 0.442 / 34.08 | 982.57 / 0.442 / 39.32 |
 | laminar error model with `down0p005_up1` (v2 smoke run) y_mean / y_std | −1.059 / 10.81 | −1.062 / 10.82 |
 | laminar error model with `down0p02_up0p8` (the rejected recipe) y_mean / y_std | −0.508 / 5.89 | −1.062 / 10.82 |
 
-Differences are within the 80/20 sampling noise. Name-based class handling reproduces the reference
+Differences are within the sampling noise of the splits. The turbulent error std depends strongly on the split, because
+the error targets are heavy-tailed (in v2's split: train std 34.3, valid std 54.8). Name-based class handling reproduces the reference
 `flow_to_label_combined`, `labels_to_remove` and `flow_to_label_filt` of both SNGPs exactly. All exporters run on
 v2-trained (smoke) models; the SNGP bundle has the same keys as the reference one, and the sizes match CharLES
 (K/K_tr 50/12 and 30/3, 3→128×6, 1024 features; error models 16/7 layers of width 60 in the CharLES count).
@@ -739,4 +743,53 @@ sys.exit(1 if bad else 0)
 
 ## 12. Reproduction of the reference models with v2
 
-Pending: the GPU trainings of 2026-10-25 and their comparison with the reference models will be summarised here.
+### 12.1 Trainings
+
+The default training TOMLs at `c459004`, trained on P100 GPUs (normal QOS) on 2026-10-25 with the cluster job recipe
+of the README. The `[turb]` branch of `error_lamturb.toml` has the same recipe and seed as `error_turb.toml` and was not
+trained separately. Outputs: `models/*_v2` on the cluster (git-ignored).
+
+| v2 model | Recipe | Time | Result (reference in parentheses) |
+|---|---|---|---|
+| `sngp_model_turb_v2` | `sngp_turb.toml`, 5000 epochs | 60 min | val acc final 0.730 (ep5000: 0.754), best 0.805 (0.795); val loss 0.665 (0.663) |
+| `sngp_model_lamturb_turb_v2` | `sngp_lamturb.toml` `[turb]`, 4000 epochs | 49 min | val acc final 0.760 (ep4000: 0.694), best 0.784 (0.746); val loss 0.653 (0.727) |
+| `sngp_model_lam_v2` | `sngp_lamturb.toml` `[lam]`, 20000 epochs | 34 min | val acc final 0.977 (0.976); val loss 0.053 (0.051) |
+| `error_model_turb_v2` | `error_turb.toml`, 10000 epochs | 41 min | best val NLL −3.787 at epoch 4405 (−3.985 at 3811); y_mean 0.442 (0.442), y_std 34.08 (39.32) |
+| `error_model_lam_v2` | `error_lamturb.toml` `[lam]`, 4000 epochs | 8 min | best val NLL −4.736 at epoch 3998 (−4.762 at 3985); y_mean −1.059 (−1.062), y_std 10.81 (10.82) |
+
+- All three SNGPs reproduce the reference class maps exactly. The v2 SNGPs use the per-epoch LR decay and active
+  dropout ([4.1](#41-changed-defaults-old-behaviour-available-as-an-option)); the reference ones used neither, which
+  explains the higher turbulent validation accuracy of v2.
+- The NLL values are on z-scored targets, so they are not directly comparable when y_std differs (heavy-tailed
+  turbulent error targets, see [10.3](#103-statistics-reproduction)).
+
+### 12.2 A-priori comparison
+
+Both test scripts on their full test sets and the full benchmark, once with the reference models and once with the v2
+models (GPU, 20 min). The scratch files are in `results/compare/` on the cluster (`run_compare.sh`, the TOML copies,
+`compare_report.py`). Mean |e| in %; for the A-airfoil the medians are in parentheses.
+
+| Test | Models (SNGP + error model) | Baseline | Blended | Always-corrected | C mean | Fully corrected |
+|---|---|---|---|---|---|---|
+| `test_turb` (Gaussian bump 2M, 41 616 points) | reference ep4000 + ep3811 | 6.84 | 2.50 | 3.42 | 0.977 | 75.6 % |
+| | v2 `lamturb_turb` (4000) + `error_turb_v2` | 6.84 | 2.41 | 3.94 | 0.996 | 71.1 % |
+| | reference ep5000 + ep3811 | 6.84 | 2.24 | 3.42 | 0.977 | 76.0 % |
+| | v2 `turb` (5000) + `error_turb_v2` | 6.84 | 2.35 | 3.94 | 0.998 | 71.1 % |
+| `test_lamturb` (A-airfoil 2M, 278 740 points) | reference | 43.14 (6.00) | 43.51 (4.56) | 31.16 (5.00) | 0.790 | 45.1 % |
+| | v2 | 43.14 (6.00) | 42.95 (5.05) | 38.44 (5.01) | 0.814 | 55.2 % |
+
+| Benchmark (77 cases, 1.48 M points) | Baseline | Blended | Always-corrected | C mean |
+|---|---|---|---|---|
+| reference, unweighted over cases | 9.62 | 8.81 | 9.00 | 0.984 |
+| v2, unweighted over cases | 9.62 | 8.60 | 9.12 | 0.990 |
+| reference, point-weighted | 6.35 | 4.05 | 3.25 | |
+| v2, point-weighted | 6.35 | 4.07 | 3.40 | |
+| reference, training cases (27) | 7.38 | 6.35 | 4.17 | |
+| v2, training cases (27) | 7.38 | 5.76 | 4.15 | |
+| reference, untrained cases (50) | 10.82 | 10.14 | 11.61 | |
+| v2, untrained cases (50) | 10.82 | 10.13 | 11.80 | |
+
+Conclusion: the v2 pipeline reproduces the reference models within training noise. Blended errors are equal or slightly
+lower, always-corrected errors slightly higher (the turbulent error model; on the A-airfoil the median is unchanged and
+the mean is driven by a few large errors), and the confidence is higher. The test TOMLs and CharLES keep the reference
+models; the v2 models are available for comparison.

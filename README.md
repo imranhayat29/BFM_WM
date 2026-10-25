@@ -373,7 +373,9 @@ mkdir -p models && cp -r <models location>/. models/
 - The laminar error model was trained on the laminar A-airfoil files up to n1/δ = 1 (`down0p005_up1`, the
   "UPY1" in its name), which `error/error_lamturb.toml` uses. The laminar SNGP was trained on the narrower
   `down0p02_up0p8` files (`sngp/sngp_lamturb.toml`).
-- The training TOMLs default to new names (`*_v2`) so that the reference models are never overwritten.
+- The training TOMLs default to new names (`*_v2`) so that the reference models are never overwritten. On the cluster
+  the folder above also holds the models trained with the default training TOMLs (`*_v2`); they perform like the
+  reference models (comparison in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), section 12).
 
 ## Baseline testing tools (upstream)
 

@@ -215,7 +215,8 @@ class WallModelDataHandler:
 
                 # --- Filtering (using DataFrames) ---
                 ymax = data_config.get('upy', 0.15)
-                ymin = data_config.get('downy', 0.005)
+                # BFM_WM_v2: default downy 0.0 keeps points down to the wall (upstream default: 0.005)
+                ymin = data_config.get('downy', 0.000)
                 if ymax < 1.0:
                     print(f"Filtering {case} with upy_max={ymax}...")
 
@@ -264,8 +265,9 @@ class WallModelDataHandler:
                     else:
                         # Only concern data that has low u1_y_over_nu and u2_y_over_nu values
                         mask1 = inputs_selected_df['u1_y_over_nu'] <= near_wall
-                        mask2 = inputs_selected_df['u1_y_over_nu'] > 0.0
-                        mask  = mask1 & mask2
+                        # BFM_WM_v2: no u1 > 0 mask, so reversed-flow (negative u1) points are kept
+                        # (upstream: mask = mask1 & (u1_y_over_nu > 0))
+                        mask = mask1
 
                         outputs_for_processing = outputs_for_processing[mask]
                         flow_type_for_processing = flow_type_for_processing[mask]
@@ -455,7 +457,8 @@ class WallModelDataHandler:
         
         # Apply optional filtering based on config
         ymax = config.get('data', {}).get('upy', 0.15)  # Upper y value for input
-        ymin = config.get('data', {}).get('downy', 0.005)  # Upper y value for input
+        # BFM_WM_v2: default downy 0.0 keeps points down to the wall (upstream default: 0.005)
+        ymin = config.get('data', {}).get('downy', 0.000)  # Lower y value for input
         
         # Filter based on upy if needed
         if ymax < 1.0:
@@ -484,7 +487,8 @@ class WallModelDataHandler:
             flow_type = flow_type[mask]
             
             print(50 * '-')
-            print(f"Filtered external dataset {dataset_key}: {len(mask)} -> {len(inputs_df)} points")
+            # BFM_WM_v2: the message also prints the applied upy (as in the BFM_WM fork)
+            print(f"Filtered external dataset {dataset_key}: {len(mask)} -> {len(inputs_df)} points based on upy_max={ymax}")
         
         # Select input columns based on input_scaling
         selected_columns = COLUMN_MAP.get(input_scaling, COLUMN_MAP[1])
@@ -498,8 +502,9 @@ class WallModelDataHandler:
             else:
                 # Only concern data that has low u1_y_over_nu and u2_y_over_nu values
                 mask1 = inputs_df['u1_y_over_nu'] <= near_wall
-                mask2 = inputs_df['u1_y_over_nu'] > 0.0
-                mask  = mask1 & mask2
+                # BFM_WM_v2: no u1 > 0 mask, so reversed-flow (negative u1) points are kept
+                # (upstream: mask = mask1 & (u1_y_over_nu > 0))
+                mask = mask1
 
                 inputs_df = inputs_df[mask]
                 outputs = outputs[mask]

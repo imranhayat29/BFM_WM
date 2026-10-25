@@ -35,7 +35,8 @@ purple2 = "#b0a4e3"
 orange2 = "#ff7500"
 cyan2   = "#bbcdc5"
 grey2   = "#36292f"
-plt.style.use('~/Codes/matplotlibstyle/mystyle.mplstyle')
+# BFM_WM_v2: personal style file is not part of the repo, so it is not loaded (upstream loaded it unconditionally)
+# plt.style.use('~/Codes/matplotlibstyle/mystyle.mplstyle')
 ##############################################################
 # Muted Morandi-inspired color palette
 # https://gist.github.com/ChuanyuXue/3a377f7c1629b0ce68bc6b393340d0fb

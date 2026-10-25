@@ -145,3 +145,20 @@ To migrate from the old monolithic class to the new modular design:
 3. Support for different neural network architectures
 4. Better error handling and user feedback
 5. More comprehensive documentation
+
+## BFM_WM_v2 changes to this package
+
+The fork changes these behaviours relative to upstream. Each change is also marked with a
+`BFM_WM_v2:` comment in the code.
+- `data_handler.py`:
+  - The default `downy` is 0.0 (upstream 0.005) in both `_load_from_raw_sources` and
+    `load_external_dataset`, so points down to the wall are kept unless `downy` is set.
+  - With `near_wall_threshold > 0`, reversed-flow points (negative `u1_y_over_nu`) are kept
+    (upstream also required `u1_y_over_nu > 0`).
+  - The filter message of `load_external_dataset` also prints the applied `upy`.
+- `wall_model.py`:
+  - `load_data()` sets `model.flow_type` (the per-sample dataset names used as SNGP class labels).
+  - The near-wall test plots invert the signed log1p exactly.
+  - `train()` passes the train/valid split indices to the trainer.
+- `trainer.py`: checkpoints store `train_index`/`valid_index` as int64 tensors. They are absent in
+  upstream and older checkpoints.

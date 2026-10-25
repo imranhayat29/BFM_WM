@@ -12,6 +12,16 @@ TURB_CASES.append(f'Case_name')
 DATASET_PLOT_TITLE[f'Case_name'] = f'Title for the case'
 '''
 
+# NOTE: BFM_WM_v2: this registry also contains every case added in the BFM_WM error-model/SNGP fork
+# (A-airfoil 2M/10M full-2D-field sets and their region splits, transition_JHU and ph_B full-2D fields,
+# NASA hump pressure-gradient regions hump_*, and the a-posteriori LES sets aposteriori_*).
+# Only the data needed for training are shipped in ./data: the hump_* regions and the laminar
+# A-airfoil sets aairfoil_2M_full2Dfield_{down0p02_up0p8,down0p005_up1}_laminar_{ZPG,APG,FPG}
+# (the down0p005_up1 keys are added by BFM_WM_v2). The other added keys
+# (aposteriori_*, aairfoil_10M*, the remaining aairfoil_2M_full2Dfield* and aairfoil_2M_{laminar,
+# transition,turbulent}, transition_JHU_full2Dfield*, ph_B_full2Dfield*) point to files that are not
+# in this repository; place the files in ./data (or pass explicit paths in the test TOMLs) to use them.
+
 import numpy as np
 
 # NOTE: High-fidelity data: case names and corresponding input files
@@ -115,6 +125,70 @@ for re in RE:
     INPUT_TURB_FILES[f'aairfoil_{re}M'] = f'./data/aairfoil_{re}M_data.{EXT}'
     TURB_CASES.append(f'aairfoil_{re}M')
     DATASET_PLOT_TITLE[f'aairfoil_{re}M'] = f'A-Airfoil, Reynolds number: {re}M'
+RE = 2
+POS = ['laminar', 'transition', 'turbulent']
+for pos in POS:
+    INPUT_TURB_FILES[f'aairfoil_{RE}M_{pos}'] = f'./data/aairfoil_{RE}M_{pos}_data.{EXT}'
+    TURB_CASES.append(f'aairfoil_{RE}M_{pos}')
+    DATASET_PLOT_TITLE[f'aairfoil_{RE}M_{pos}'] = f'A-Airfoil, Reynolds number: {RE}M, {pos} region'
+
+# New Full 2D field data for aairfoil at Re=2M and 10M
+RE = [2, 10]
+for re in RE:
+    INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield'] = f'./data/aairfoil_{re}M_full2Dfield.{EXT}'
+    TURB_CASES.append(f'aairfoil_{re}M_full2Dfield')
+    DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field'
+
+# Also split the full 2D field data into laminar, transition, and turbulent regions based on x/c location
+POS = ['laminar', 'transition', 'turbulent']
+for re in RE:    
+    for pos in POS:
+        INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield_{pos}'] = f'./data/aairfoil_{re}M_full2Dfield_{pos}.{EXT}'
+        TURB_CASES.append(f'aairfoil_{re}M_full2Dfield_{pos}')
+        DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield_{pos}'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field, {pos} region'
+
+# Full 2D field with wall-normal sampling range specified
+for re in RE:
+    INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield_down0p02_up0p8'] = f'./data/aairfoil_{re}M_full2Dfield_down0p02_up0p8.{EXT}'
+    TURB_CASES.append(f'aairfoil_{re}M_full2Dfield_down0p02_up0p8')
+    DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield_down0p02_up0p8'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field'
+
+for re in RE:    
+    for pos in POS:
+        INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}'] = f'./data/aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}.{EXT}'
+        TURB_CASES.append(f'aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}')
+        DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field, {pos} region'
+
+REG = ['APG', 'FPG', 'ZPG']
+for re in RE:    
+    for pos in POS:
+        for reg in REG:
+            INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}_{reg}'] = f'./data/aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}_{reg}.{EXT}'
+            TURB_CASES.append(f'aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}_{reg}')
+            DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield_down0p02_up0p8_{pos}_{reg}'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field, {pos}, {reg} region'
+
+# Full 2D field with wall-normal sampling range specified
+for re in RE:
+    INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield_down0_up1'] = f'./data/aairfoil_{re}M_full2Dfield_down0_up1.{EXT}'
+    TURB_CASES.append(f'aairfoil_{re}M_full2Dfield_down0_up1')
+    DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield_down0_up1'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field'
+
+# Filtered Cf: Full 2D field with wall-normal sampling range specified
+for re in RE:
+        INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w5_tr3_x0p02to0p98'] = f'./data/aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w5_tr3_x0p02to0p98.{EXT}'
+        TURB_CASES.append(f'aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w5_tr3_x0p02to0p98')
+        DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w5_tr3_x0p02to0p98'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field'
+
+for re in RE:
+        INPUT_TURB_FILES[f'aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall'] = f'./data/aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.{EXT}'
+        TURB_CASES.append(f'aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall')
+        DATASET_PLOT_TITLE[f'aairfoil_{re}M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall'] = f'A-Airfoil, Reynolds number: {re}M, Full 2D field'
+
+# BFM_WM_v2: laminar A-airfoil sets from n1/delta 0.005 to 1, the additional training data of the laminar error model
+for reg in REG:
+    INPUT_TURB_FILES[f'aairfoil_2M_full2Dfield_down0p005_up1_laminar_{reg}'] = f'./data/aairfoil_2M_full2Dfield_down0p005_up1_laminar_{reg}.{EXT}'
+    TURB_CASES.append(f'aairfoil_2M_full2Dfield_down0p005_up1_laminar_{reg}')
+    DATASET_PLOT_TITLE[f'aairfoil_2M_full2Dfield_down0p005_up1_laminar_{reg}'] = f'A-Airfoil, Reynolds number: 2M, Full 2D field, laminar, {reg} region'
 
 # NOTE: Gaussian data (2M)
 RE = 2
@@ -196,6 +270,16 @@ for rg in REGION:
     TURB_CASES.append(f'Transition_{rg}')
     DATASET_PLOT_TITLE[f'Transition_{rg}'] = f'Transition ZPG Boundary Layer: {rg} region'
 
+# NOTE: Transition JHU full 2D field with wall-normal sampling range specified
+INPUT_TURB_FILES[f'transition_JHU_full2Dfield_down0_up1'] = f'./data/transition_JHU_full2Dfield_down0_up1.{EXT}'
+TURB_CASES.append(f'transition_JHU_full2Dfield_down0_up1')
+DATASET_PLOT_TITLE[f'transition_JHU_full2Dfield_down0_up1'] = f'Transition ZPG Boundary Layer'
+
+for rg in REGION:
+    INPUT_TURB_FILES[f'transition_JHU_full2Dfield_down0_up1_{rg}'] = f'./data/transition_JHU_full2Dfield_down0_up1_{rg}.{EXT}'
+    TURB_CASES.append(f'transition_JHU_full2Dfield_down0_up1_{rg}')
+    DATASET_PLOT_TITLE[f'transition_JHU_full2Dfield_down0_up1_{rg}'] = f'Transition ZPG Boundary Layer: {rg} region'
+
 # NOTE: NACA0012 laminar (Rec=5000)
 INPUT_TURB_FILES[  f'naca0012_laminar'] = f'./data/naca0012_laminar_data.{EXT}'
 TURB_CASES.append( f'naca0012_laminar')
@@ -239,13 +323,167 @@ for re in RE:
     TURB_CASES.append(f'ph_G_{re}')
     DATASET_PLOT_TITLE[f'ph_G_{re}'] = f'Periodic Hill by Gloerfelt: {case}'
 
+# NOTE: ph_B: Full 2D field with wall-normal sampling range specified
+INPUT_TURB_FILES[f'ph_B_full2Dfield_down0_up1'] = f'./data/ph_B_full2Dfield_fixeddelta_delta1_down0_up1.{EXT}'
+TURB_CASES.append(f'ph_B_full2Dfield_down0_up1')
+DATASET_PLOT_TITLE[f'ph_B_full2Dfield_down0_up1'] = f'Periodic Hill: ph_B'
+
+# NOTE: NASA Hump Uzun et al. (2017) with PG zones
+REGION = ['APG', 'FPG', 'APG_SEP1', 'APG_SEP2', 'FPG_SEP']
+for r in REGION:
+    INPUT_TURB_FILES[f'hump_{r}'] = f'./data/hump_{r}_data.{EXT}'
+    TURB_CASES.append(f'hump_{r}')
+    DATASET_PLOT_TITLE[f'hump_{r}'] = f'NASA Hump: {r}'
+
+# NOTE: Aposteriori Channel Re
+casename = 'aposteriori_CH4200'
+GRID_LEVEL = ['C', 'N', 'F']
+for case in GRID_LEVEL:
+    INPUT_TURB_FILES[f'{casename}_{case}'] = f'./data/{casename}_{case}.{EXT}'
+    TURB_CASES.append(f'{casename}_{case}')
+    DATASET_PLOT_TITLE[f'{casename}_{case}'] = f'{casename}_{case}'
+
+# NOTE: Aposteriori High Lift CRM
+casename = 'aposteriori_CRM'
+AOA = ['6', '17', '23']
+for case in AOA:
+    INPUT_TURB_FILES[f'{casename}_aoa{case}'] = f'./data/{casename}_aoa{case}.{EXT}'
+    TURB_CASES.append(f'{casename}_aoa{case}')
+    DATASET_PLOT_TITLE[f'{casename}_aoa{case}'] = f'{casename}_aoa{case}'
+
+# NOTE: Aposteriori High Lift CRM (no flaps) new data with x,y,z
+casename = 'aposteriori_CRM_tc2p2'
+AOA = ['6', '17', '23']
+for case in AOA:
+    INPUT_TURB_FILES[f'{casename}_aoa{case}_new'] = f'./data/{casename}_aoa{case}_new.{EXT}'
+    TURB_CASES.append(f'{casename}_aoa{case}_new')
+    DATASET_PLOT_TITLE[f'{casename}_aoa{case}_new'] = f'{casename}_aoa{case}_new'
+
+# NOTE: Aposteriori High Lift CRM (no flaps) new data with x,y,z and with long time WM input filtering
+casename = 'aposteriori_CRM_tc2p2'
+AOA = ['6', '17', '23']
+for case in AOA:
+    INPUT_TURB_FILES[f'{casename}_aoa{case}_snapshot100'] = f'./data/{casename}_aoa{case}_snapshot100.{EXT}'
+    TURB_CASES.append(f'{casename}_aoa{case}_snapshot100')
+    DATASET_PLOT_TITLE[f'{casename}_aoa{case}_snapshot100'] = f'{casename}_aoa{case}_snapshot100'
+
+# NOTE: Aposteriori High Lift CRM (with flaps) new data with x,y,z and with long time WM input filtering
+casename = 'aposteriori_CRM_tc2p3'
+AOA = ['6', '17', '23']
+for case in AOA:
+    INPUT_TURB_FILES[f'{casename}_aoa{case}_snapshot100'] = f'./data/{casename}_aoa{case}_snapshot100.{EXT}'
+    TURB_CASES.append(f'{casename}_aoa{case}_snapshot100')
+    DATASET_PLOT_TITLE[f'{casename}_aoa{case}_snapshot100'] = f'{casename}_aoa{case}_snapshot100'
+
+# NOTE: Aposteriori High Lift CRM (with flaps) new data with x,y,z and with long time WM input filtering + fuselage refined L10
+casename = 'aposteriori_CRM_tc2p3'
+AOA = ['6', '17', '23']
+for case in AOA:
+    INPUT_TURB_FILES[f'{casename}_aoa{case}_fuseL10_snapshot100'] = f'./data/{casename}_aoa{case}_fuseL10_snapshot100.{EXT}'
+    TURB_CASES.append(f'{casename}_aoa{case}_fuseL10_snapshot100')
+    DATASET_PLOT_TITLE[f'{casename}_aoa{case}_fuseL10_snapshot100'] = f'{casename}_aoa{case}_fuseL10_snapshot100'
+
+# NOTE: Aposteriori Gaussian
+casename = 'aposteriori_Gaussian'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian testing
+casename = 'aposteriori_Gaussian_testing'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian centerline
+casename = 'aposteriori_Gaussian_CL'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian centerline averaged
+casename = 'aposteriori_Gaussian_CL_tavg'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian centerline signed
+casename = 'aposteriori_Gaussian_CL_sign'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian centerline signed averaged
+casename = 'aposteriori_Gaussian_CL_sign_tavg'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian signed
+casename = 'aposteriori_Gaussian_sign'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian signed combined snapshots
+casename = 'aposteriori_Gaussian_combsnaps20_sign'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian CL signed combined snapshots
+casename = 'aposteriori_Gaussian_combsnaps100_CL_sign'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori Gaussian CL signed averaged combined snapshots
+casename = 'aposteriori_Gaussian_combsnaps100_CL_sign_tavg'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori TBL at 5deg
+casename = 'aposteriori_TBL_5'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori TBL at 5deg averaged
+casename = 'aposteriori_TBL_5_averaged'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori TBL at 5deg coarse
+casename = 'aposteriori_TBL_5_coarse'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori TBL at 5deg medium
+casename = 'aposteriori_TBL_5_medium'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori TBL at 5deg filtered dpdx
+casename = 'aposteriori_TBL_5_filtered_dpdx'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
+
+# NOTE: Aposteriori TBL at 5deg filtered dpdx long
+casename = 'aposteriori_TBL_5_filtered_dpdx_long'
+INPUT_TURB_FILES[f'{casename}'] = f'./data/{casename}.{EXT}'
+TURB_CASES.append(f'{casename}')
+DATASET_PLOT_TITLE[f'{casename}'] = f'{casename}'
 
 def print_dataset_tree(datasets, indent=0):
     for key, value in datasets.items():
         print('    ' * indent + f"├── {key}")
         if isinstance(value, dict) and value:  # Only recurse if the value is a non-empty dictionary
             print_dataset_tree(value, indent + 1)
-
 
             # Dataset dictionary representing a tree-like structure
 TURB_CASES_TREE = {

@@ -509,6 +509,13 @@ class WallModelTrainer:
 
         return prefix
 
+    @staticmethod
+    def _index_tensor(index) -> Optional[torch.Tensor]:
+        """BFM_WM_v2: split indices as an int64 CPU tensor (None stays None) for the checkpoint."""
+        if index is None:
+            return None
+        return torch.as_tensor(np.asarray(index), dtype=torch.int64).cpu()
+
     def _save_model(self, path: str) -> None:
         """
         Save the model without data to reduce file size
@@ -554,7 +561,13 @@ class WallModelTrainer:
             'output_scaling': self.config.get('model', {}).get('outputs', {}).get('OutputScaling', None),
             'Nl': self.config.get('model', {}).get('architecture', {}).get('NumLayers', None),
             'Nn': self.config.get('model', {}).get('architecture', {}).get('NumNeurons', None),
-            'Ni': getattr(self, 'input_dim', None) # NOTE: Is this correct?
+            'Ni': getattr(self, 'input_dim', None), # NOTE: Is this correct?
+
+            # BFM_WM_v2: train/valid split indices (into the concatenated training data), set by
+            # WallModel.train(); None when unavailable. Upstream checkpoints do not contain these keys.
+            # Stored as torch int64 tensors so that torch.load(weights_only=True) can still read the file.
+            'train_index': self._index_tensor(getattr(self, 'train_index', None)),
+            'valid_index': self._index_tensor(getattr(self, 'valid_index', None)),
         }
 
         # Add LDS parameters if used

@@ -280,7 +280,8 @@ class WallModel(WallModelBase):
         # Store in data handler for consistency
         self.data_handler.input = self.input
         self.data_handler.output = self.output
-        # self.data_handler.flow_type = self.flow_type
+        # BFM_WM_v2: expose the per-sample dataset names (SNGP class labels); upstream left this commented out
+        self.flow_type = self.data_handler.flow_type
         self.data_handler.input_dim = self.input_dim
         
         # Preprocess data
@@ -333,7 +334,12 @@ class WallModel(WallModelBase):
         # Store sample counts for model naming
         trainer.n_train = len(self.train_index)
         trainer.n_valid = len(self.valid_index)
-        
+
+        # BFM_WM_v2: the split indices are saved in the checkpoint so that the error-model/SNGP training
+        # can reuse the baseline's actual train/valid split (upstream checkpoints do not store them)
+        trainer.train_index = self.train_index
+        trainer.valid_index = self.valid_index
+
         # Train model
         self.model = trainer.train(
             input_train_tensor,
@@ -708,7 +714,8 @@ class WallModel(WallModelBase):
 
             # Convert back from log scale if needed
             if near_wall > 0.0:
-                inputs = np.exp(inputs) - 1
+                # BFM_WM_v2: exact inverse of the signed log1p used in near-wall mode (upstream: np.exp(inputs) - 1)
+                inputs = np.sign(inputs) * (np.exp(np.abs(inputs)) - 1)
             
             # Plot error scatter
             max_err, mean_abs_err, std_abs_err, mean_rel_err, std_rel_err = self.visualizer.plot_results_scatter_error(

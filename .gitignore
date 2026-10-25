@@ -1,5 +1,5 @@
 # Directories to ignore in the repository
-inputfiles/
+# BFM_WM_v2: inputfiles/ is tracked (baseline, SNGP, error-model, test and benchmark TOMLs); upstream ignored it
 create_data/
 __pycache__/
 results/

@@ -1,0 +1,21 @@
+# Python 3.11 is required: the saved error models (Keras SavedModels with a DistributionLambda output layer)
+# contain cloudpickled Python 3.11 bytecode, and the TensorFlow stack below is pinned for legacy-Keras
+# SavedModel loading (TF_USE_LEGACY_KERAS=1 with tf_keras). Versions match the environment the shipped
+# models were tested with.
+numpy==2.1.0
+scipy==1.16.0
+pandas==2.3.0
+tables==3.10.2
+h5py==3.14.0
+matplotlib==3.10.3
+scikit-learn==1.7.0
+toml==0.10.2
+torch==2.7.1
+tensorflow==2.19.0
+tf_keras==2.19.0
+tensorflow-probability==0.25.0
+tf-models-official==2.19.1
+# Used by the parent baseline scripts (training logging, interactive testing, plots)
+wandb==0.20.1
+python-Levenshtein==0.27.1
+mplcursors==0.6

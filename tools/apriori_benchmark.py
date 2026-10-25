@@ -716,14 +716,16 @@ def _domain_description(ev: Mapping[str, Any]) -> str:
 def dry_run(cfg: Mapping[str, Any], keys: Sequence[str]) -> int:
     """Resolve every dataset file (and the models) without loading anything; returns the number of problems."""
     import pandas as pd
-    from src_err.utils import resolve_dataset_file, resolve_model_path  # torch-free, unlike src_err.data
+    from src_err.cli import missing_model  # torch-free, unlike src_err.data
+    from src_err.utils import resolve_dataset_file, resolve_model_path
 
     problems = 0
     print("=" * 80)
     print("Models:")
     for role, name in cfg["models"].items():
-        path = resolve_model_path(name)
-        ok = os.path.exists(path)
+        # Same rule as the run's input check and the loaders (a file is not an SNGP/error-model directory)
+        ok = missing_model(role, name) is None
+        path = resolve_model_path(name, directory=(role != "Baseline"))
         problems += 0 if ok else 1
         print(f"  {role:<9s}{'OK     ' if ok else 'MISSING'} {path}")
     print(f"Datasets ({len(keys)}):")

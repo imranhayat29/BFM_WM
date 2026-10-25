@@ -73,6 +73,9 @@ models/                  trained models (git-ignored)
 - On the cluster, the environment already exists: `source <path-to-venv>/bin/activate`.
   Its base interpreter `/usr/bin/python3.11` exists on the login nodes only, so this works there but not in
   GPU jobs (see [Running on a GPU node](#running-on-a-gpu-node-slurm)).
+  For a venv of your own on the cluster, run `unset PYTHONPATH` before creating, filling (`pip install`) and
+  activating it: the auto-loaded modules put Python 3.10 packages on `PYTHONPATH`, which shadow the venv's.
+  The shared torch-venv's `activate` already does this.
 - Run all scripts from the repository root. Paths are relative to it: `./inputfiles`, `./models`, `./data`,
   `./results`.
 - `TF_USE_LEGACY_KERAS=1` is set automatically by `src_err` before TensorFlow is imported.
@@ -88,7 +91,7 @@ Data are stored in `data/` directories. They cover data summarized in [Table](ht
 
 | File | Change | Why |
 |---|---|---|
-| `FS_ZPG_data.h5`, `FS_APG_data.h5`, `FS_FPG_data.h5` | replaced (about 5x more points) | Falkner-Skan data the laminar baseline was trained on |
+| `FS_ZPG_data.h5`, `FS_APG_data.h5`, `FS_FPG_data.h5` | replaced (about 5x more points) | the Falkner-Skan versions both shipped baselines (laminar and turbulent) were trained on, hence also part of the turbulent SNGP and error-model training data |
 | `curved_TBL_APG_data.h5`, `curved_TBL_FPG_data.h5` | replaced (same numbers, case names `curved_BL_APG`/`curved_BL_FPG` instead of `curved_BL`) | the SNGP needs the two classes to be distinct |
 | `aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_{ZPG,APG,FPG}.h5` | added | additional training data of the laminar SNGP (n1/δ 0.02-0.8, with a `kt_km` column) |
 | `aairfoil_2M_full2Dfield_down0p005_up1_laminar_{ZPG,APG,FPG}.h5` | added | additional training data of the laminar error model (n1/δ 0.005-1, with a `kt_km` column) |
@@ -96,8 +99,9 @@ Data are stored in `data/` directories. They cover data summarized in [Table](ht
 - The lam-turb test set `aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5` is **not shipped**.
   It is a full 2D-field extraction of the A-airfoil at Re = 2M, with the `kt_km` column. `test/test_lamturb.toml`
   reads it by path (`[data.Files]`, relative to the repository root) from the BFM_WM fork checked out next to
-  this repository, `../BFM_WM/data/`. If the file lives elsewhere, edit that path (or place the file in `data/`
-  and remove the entry).
+  this repository, `../BFM_WM/data/`. The file is not tracked in that fork either; on the cluster it is
+  `/path/to/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5`.
+  If the file lives elsewhere, edit that path (or place the file in `data/` and remove the entry).
 - `wall_model_cases.py` registers every case of the BFM_WM fork. Some keys point to files that are not shipped
   (the comment at the top of the file lists them).
 - In the BFM_WM fork, the local copies of `gaussian_2M_data_MAPG.h5` and `gaussian_2M_data_FPG.h5` are
@@ -170,6 +174,10 @@ The output directory (`[general] OutputDir`) receives:
   lam/turb switch counts;
 - optionally `arrays.npz`, with every per-point field.
 
+In these outputs, as in the notebooks, "corrected" (`summary.json` errors `corrected`, `map_corrected`,
+`tri_corrected`, "Expert Model" in the PDFs) is the blended prediction $y_{final}$, and "always corrected" is the
+always-corrected candidate $y_{corr}$ everywhere.
+
 The test truth is the dataset target. **No prediction uses any true-target information**: gates, fallbacks and
 y+ use only quantities available at inference time, as in CharLES. All comparisons are on magnitudes.
 
@@ -213,8 +221,11 @@ export OMP_NUM_THREADS=8 TF_NUM_INTRAOP_THREADS=8 TF_NUM_INTEROP_THREADS=2
 
 ## The blended prediction
 
-Inputs (InputScaling 2): $\pi_1 = u_1 n_1/\nu$, $\pi_2 = u_p n_1/\nu$, $\pi_3 = u_2 n_1/\nu$. Output:
-$\pi_{out} = u_\tau n_1/\nu$, which is the $y^+$ of that $u_\tau$.
+Inputs (InputScaling 2): $\pi_1 = u_1 n_1/\nu$, $\pi_2 = u_p n_1/\nu$, $\pi_3 = u_2 n_1/\nu$. Here $n_1$ is the wall
+distance of the matching point, $u_1$ and $u_2$ are the wall-parallel velocities at $n_1$ and $3n_1$ (signed along a
+fixed wall tangent in the datasets), and $u_p = \mathrm{sign}(dp/ds)\,(\nu|dp/ds|/\rho)^{1/3}$. Output:
+$\pi_{out} = u_\tau n_1/\nu$, which is the $y^+$ of that $u_\tau$. $y$ denotes the dataset target $\pi_{out}$, and $\delta$
+(in the $n_1/\delta$ windows of the TOMLs) the boundary-layer thickness.
 
 1. **Baseline:** $\hat y_b = |\mathrm{NN}(\pi)|$. The network is trained on magnitudes, but its linear output
    layer can return small negative values (close to the wall and around separation).
@@ -232,15 +243,15 @@ $\pi_{out} = u_\tau n_1/\nu$, which is the $y^+$ of that $u_\tau$.
    - Ramps: $r_\uparrow(m;t,d) = \mathrm{clip}\big(\frac{m-(t-d)}{2d},0,1\big)$ and
      $r_\downarrow(m;t,d) = \mathrm{clip}\big(\frac{t+d-m}{2d},0,1\big)$.
    - Weights: $\alpha_a = r_\downarrow(m)$, $\alpha_c = r_\uparrow(C)$, $\alpha_{nw} = r_\uparrow(y^+_{nw})$.
-   - Prediction: $y = \alpha_{nw}\big[\alpha_c(\alpha_a y_{corr} + (1-\alpha_a)\hat y_b) + (1-\alpha_c)\,y_{fb}\big] + (1-\alpha_{nw})\,y_{fb}$.
+   - Prediction: $y_{final} = \alpha_{nw}\big[\alpha_c(\alpha_a y_{corr} + (1-\alpha_a)\hat y_b) + (1-\alpha_c)\,y_{fb}\big] + (1-\alpha_{nw})\,y_{fb}$.
 6. **Fallback $y_{fb}$:**
    - **Turbulent points:** the EQWM, which is the CharLES two-layer law: $u^+ = y^+$ for
      $y^+ \le 11.0623$, else $u^+ = \ln(y^+)/0.41 + 5.2$, solved from $|\pi_1| = u^+ y^+$. Here
      $y^+_{nw} = \pi_{out,EQWM}$. `[eqwm] Law = "parent"` uses the notebooks' `log_law_solve` instead.
    - **Laminar points** (lam-turb, $k_t/k_m \le$ `KtKmThreshold` = 0.002): the laminar law
      $\tau_w = \mu|u_1|/y_1$, i.e. $\pi_{out} = \sqrt{|\pi_1|}$, for both fallbacks. Its own $y^+_{nw} = \sqrt{|\pi_1|}$.
-7. **Evaluation:** $e\% = w_t\,\frac{100(y-\hat y)}{y} + (1-w_t)\,\frac{100(y-\hat y)}{\sqrt{|\pi_1|}}$, with
-   $w_t = r_\uparrow(y; 2, 1)$ on the true $\pi_{out}$.
+7. **Evaluation:** $e\% = w_t\,\frac{100(y-\hat y)}{y} + (1-w_t)\,\frac{100(y-\hat y)}{\sqrt{|\pi_1|}}$ for any prediction
+   $\hat y$ ($\hat y_b$, $y_{corr}$, $y_{final}$ or the EQWM), with $w_t = r_\uparrow(y; 2, 1)$ on the true $\pi_{out}$.
 
 ## Configuration
 
@@ -285,6 +296,12 @@ Dropped notebook features:
 Changed defaults (the old behaviour stays available as options):
 - The SNGP learning rate decays per epoch (`DecayUnit = "step"` reproduces the shipped models).
 - SNGP dropout is applied (`DropoutActive = false` reproduces the shipped models).
+- The EQWM is the CharLES two-layer law (`[eqwm] Law = "parent"` gives the notebooks' `log_law_solve`).
+
+Changed behaviour (as in CharLES BFMv2, no option):
+- Laminar points (lam-turb): the lam-turb notebook switched the confidence and near-wall fallbacks off there
+  (it clamped $C$ and $y^+$ above the gates). v2 applies both, falling back to the laminar law
+  $\tau_w = \mu|u_1|/y_1$ (no $dp/ds$ term) with its own $y^+_{nw} = \sqrt{|\pi_1|}$.
 
 Notebook behaviour that was fixed:
 - The always-corrected candidate is $|\mathrm{NN}(\pi) + \mu|$. The notebooks used $\big|\,|\mathrm{NN}(\pi)| + \mu\,\big|$,
@@ -296,7 +313,13 @@ Notebook behaviour that was fixed:
 - `downy` is honoured even when `upy` ≥ 1.
 - Percent errors use the low-value blend on the true $\pi_{out}$ for every prediction, including the EQWM.
 
-## Shipped models (`models/`, git-ignored)
+## Shipped models (`models/`, not in git)
+
+`models/` is git-ignored, as upstream (the BFM_WM fork does not track its models either). On the cluster the
+files are in `<models location>/`; copy them into a clone with
+```bash
+mkdir -p models && cp -r <models location>/. models/
+```
 
 | Model | Role |
 |---|---|

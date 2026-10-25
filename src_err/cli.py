@@ -15,7 +15,7 @@ import os
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from src_err.config import BRANCHES, load_error_config, load_sngp_config
-from src_err.utils import resolve_dataset_file, resolve_model_path
+from src_err.utils import model_hint, resolve_dataset_file, resolve_model_path
 
 
 # ---------------------------------------------------------------------------------------
@@ -181,7 +181,7 @@ def select_gpu(args: argparse.Namespace, cfgs: Iterable[Optional[Dict[str, Any]]
     return nums[0]
 
 
-def _missing_model(role: str, name: str) -> Optional[str]:
+def missing_model(role: str, name: str) -> Optional[str]:
     """
     Problem message if a model cannot be found, resolved as its loader resolves it
 
@@ -196,11 +196,11 @@ def _missing_model(role: str, name: str) -> Optional[str]:
     if role == "Baseline":
         if os.path.isfile(resolve_model_path(name)):
             return None
-        return f"Baseline checkpoint not found: {name} (tried ./models/{name})"
+        return f"Baseline checkpoint not found: {model_hint(name)}"
     if os.path.isdir(resolve_model_path(name, directory=True)):
         return None
     what = "SNGP" if role == "Sngp" else "Error"
-    return f"{what} model directory not found: {name} (tried ./models/{name})"
+    return f"{what} model directory not found: {model_hint(name)}"
 
 
 def check_inputs(cfgs: Iterable[Optional[Dict[str, Any]]]) -> None:
@@ -245,7 +245,7 @@ def check_inputs(cfgs: Iterable[Optional[Dict[str, Any]]]) -> None:
             models += [(f"[{table}] {role}", role, name) for role, name in entries.items()]
         for label, role, name in models:
             model_names.add(name)
-            msg = _missing_model(role, name)
+            msg = missing_model(role, name)
             if msg is not None:
                 problems.append(f"{where}: {label}: {msg}")
     if len(problems) == 1:

@@ -137,11 +137,11 @@ def load_baseline_model(checkpoint: str, device: Any):
         WallModel in eval mode (its `config` is the checkpoint's embedded config)
     """
     from src.wall_model import WallModel
-    from src_err.utils import resolve_model_path
+    from src_err.utils import model_hint, resolve_model_path
 
     path = resolve_model_path(checkpoint)
     if not os.path.isfile(path):
-        raise FileNotFoundError(f"Baseline checkpoint not found: {checkpoint} (tried ./models/{checkpoint})")
+        raise FileNotFoundError(f"Baseline checkpoint not found: {model_hint(checkpoint)}")
     print("=" * 80)
     print(f"Loading baseline checkpoint {path}")
     try:
@@ -166,6 +166,36 @@ def load_baseline_model(checkpoint: str, device: Any):
     print(f"  HiddenLayers            : {cfg.get('model', {}).get('HiddenLayers')}")
     print("=" * 80)
     return model
+
+
+def baseline_output(model: Any, X: np.ndarray, batch: int = 65536) -> np.ndarray:
+    """
+    Raw baseline network output pi_out in batches (torch, no-grad, on the model's device)
+
+    The error-model targets (eps = y - output) and the inference pipeline both use this
+    function, so the error model is trained on exactly the quantity it later corrects.
+
+    Args:
+        model: WallModel (its `.model` is the torch network; inputs are used raw, as the parent)
+        X: (N, D) inputs in the checkpoint's input space
+        batch: Rows per forward pass
+
+    Returns:
+        (N,) float64 raw outputs in pi_out units (no magnitude taken; may be negative)
+    """
+    net = model.model
+    net.eval()
+    dev = next(net.parameters()).device
+    X = np.asarray(X)
+    out = np.empty(len(X), dtype=np.float64)
+    with torch.no_grad():
+        for s in range(0, len(X), int(batch)):
+            xb = torch.from_numpy(np.ascontiguousarray(X[s:s + batch])).float().to(dev)
+            out[s:s + batch] = net(xb).reshape(-1).cpu().numpy()
+    if model.config.get("training", {}).get("LogTransform", False):
+        # Parent test path (src/wall_model.py): outputs trained on log(1 + y)
+        out = np.exp(out) - 1.0
+    return out
 
 
 def training_dataset_keys(model_config: Dict[str, Any]) -> List[str]:

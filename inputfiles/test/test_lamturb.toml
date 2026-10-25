@@ -1,6 +1,6 @@
 # A-priori test of the laminar-turbulent BFM wall model (two branches, Kt/Km hard switch).
 # Defaults reproduce the lam-turb notebook (LT-NB, A-airfoil 2M) with these changes: inference-only
-# gates, magnitudes everywhere, CharLES BFMv2 EQWM law and blend nesting; laminar points fall back to the
+# gates, magnitudes everywhere, CharLES BFMv2 EQWM law; laminar points fall back to the
 # laminar law tau_w = mu |u1|/y1 (no dp/ds) for both the confidence and the near-wall switch, as CharLES BFMv2.
 # Run from the repository root:
 #   python test_lamturb.py test/test_lamturb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
@@ -55,7 +55,8 @@ MaxSamples = 0       # > 0: deterministic evenly spaced subsample of all points 
 [data.Files]
 # Explicit h5 path per dataset key (needed for the non-shipped default dataset). Paths are relative to the
 # repository root, where the scripts run: this one is the copy in the BFM_WM fork checked out next to this
-# repository. Edit it if the file lives elsewhere (or place the file in ./data/ and remove the entry).
+# repository (untracked there; on the cluster: <local clone of BFM_WM>/data/).
+# Edit it if the file lives elsewhere (or place the file in ./data/ and remove the entry).
 aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall = "../BFM_WM/data/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5"
 
 [eqwm]
@@ -66,7 +67,7 @@ Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, = CharLES an
 
 [gates]
 # Same switches for both branches (CharLES BFMv2 nesting); fallback = EQWM on turbulent, laminar law on laminar points
-Aleatoric  = { Type = "percentage", Threshold = 15.0, Delta = 5.0 }   # Correct where sigma% < 15 +- 5 ("ratio" = sigma/|mu|)
+Aleatoric  = { Type = "percentage", Threshold = 15.0, Delta = 5.0 }   # Correct where sigma% < 15 +- 5 ("ratio" = sigma/|mu|: also set Threshold 1.0, Delta 0.5 as the notebooks)
 Confidence = { Threshold = 0.85, Delta = 0.1 }    # Keep the NN where C (branch SNGP) > 0.85 +- 0.1, else fallback
 Yplus      = { Threshold = 4.0, Delta = 2.0 }     # Keep the NN where y+ > 4 +- 2 (EQWM u_tau; laminar points: sqrt(|pi_1|)), else fallback
 LowValue   = { Threshold = 2.0, Delta = 1.0 }     # sigma%/mu% = 100 q/|pi_out,baseline|, blended with 100 q/sqrt(|pi_1|) below |pi_out,baseline| 2 +- 1
@@ -77,7 +78,7 @@ LowValue = { Threshold = 2.0, Delta = 1.0 }       # Evaluation % errors: 100 e/|
 [plots]
 SpatialMaps = true   # Scatter maps over (x/c, n1/delta) and raw-n1 maps of the laminar region (map_*, map_rawn1_*)
 CfLines     = true   # |C_f| along x/c at one n1 station per x, raw and moving-averaged (cf_lines, cf_lines_ma)
-Pdfs        = true   # PDFs of |e%| (baseline, corrected, EQWM) and of C (pdf_errors, pdf_confidence)
+Pdfs        = true   # PDFs of |e%| (baseline, corrected = blended, EQWM) and of C (pdf_errors, pdf_confidence)
 Tripcolor   = true   # Smoothed tripcolor maps with OOD / near-wall-fallback hatching (tri_*)
 
 [plots.maps]

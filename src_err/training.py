@@ -49,7 +49,6 @@ SMOKE_SAVE_DIR = os.path.join(".", "results", "smoke", "models")
 SMOKE_RESULTS_DIR = os.path.join(".", "results", "smoke", "training")
 RESULTS_DIR = os.path.join(".", "results", "training")
 SMOKE_CAPS = {"baseline_train": 20000, "baseline_valid": 5000, "extra_train": 5000, "extra_valid": 5000}
-BASELINE_BATCH = 65536
 SNGP_PREDICT_BATCH = 512  # the GP layer forms a B x B covariance per batch in inference
 
 
@@ -167,29 +166,6 @@ def _cap_index(n: int, cap: int, seed: int, salt: int) -> np.ndarray:
         return np.arange(n)
     rng = np.random.default_rng([int(seed), int(salt)])
     return np.sort(rng.choice(n, size=cap, replace=False))
-
-
-def baseline_predict(model, X: np.ndarray, batch: int = BASELINE_BATCH) -> np.ndarray:
-    """
-    Raw baseline output (pi_out, as trained; no magnitude taken) in batches
-
-    Args:
-        model: WallModel (its torch network is used in eval mode)
-        X: (N, 3) inputs in the checkpoint's input space
-        batch: Rows per forward pass
-
-    Returns:
-        (N,) float64 predictions
-    """
-    net = model.model
-    net.eval()
-    device = next(net.parameters()).device
-    out = np.empty(len(X), dtype=np.float64)
-    with torch.no_grad():
-        for s in range(0, len(X), batch):
-            xb = torch.as_tensor(np.asarray(X[s:s + batch]), dtype=torch.float32, device=device)
-            out[s:s + batch] = net(xb).reshape(-1).cpu().numpy()
-    return out
 
 
 def _release_baseline_data(model) -> None:
@@ -469,7 +445,7 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
         parts["extra_valid"] = (extras.split.valid.X, extras.split.valid.y)
     errs = {}
     for k, (X, y) in parts.items():
-        errs[k] = em.error_targets(y, baseline_predict(model, X))
+        errs[k] = em.error_targets(y, dat.baseline_output(model, X))
         print(f"  {k:<15} {len(X):9d} points, error mean {errs[k].mean():+.4g}, std {errs[k].std():.4g}")
 
     tr_keys = [k for k in parts if k.endswith("train")]

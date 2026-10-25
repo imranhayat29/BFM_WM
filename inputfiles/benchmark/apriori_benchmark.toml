@@ -118,7 +118,7 @@ Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, = CharLES) o
 # Three smooth switches (linear ramps Threshold +- Delta, CharLES smoothBlend*), nested as in CharLES BFMv2:
 #   y_final = a_nw*(a_c*(a_a*y_corr + (1-a_a)*y_base) + (1-a_c)*y_eqwm) + (1-a_nw)*y_eqwm
 # All gate quantities are inference-only (no dataset target or dataset u_tau).
-Aleatoric  = { Type = "percentage", Threshold = 10.0, Delta = 5.0 }   # Correct where sigma% < 10 +- 5 ("ratio" = sigma/|mu|, notebooks 1.0 +- 0.5)
+Aleatoric  = { Type = "percentage", Threshold = 10.0, Delta = 5.0 }   # Correct where sigma% < 10 +- 5 ("ratio" = sigma/|mu|: also set Threshold 1.0, Delta 0.5 as the notebooks)
 Confidence = { Threshold = 0.7, Delta = 0.05 }    # Keep the NN where the SNGP confidence C > 0.7 +- 0.05, else EQWM fallback
 Yplus      = { Threshold = 4.0, Delta = 2.0 }     # Keep the NN where y+ (from the EQWM u_tau) > 4 +- 2, else EQWM fallback
 LowValue   = { Threshold = 2.0, Delta = 1.0 }     # sigma% = 100 sigma/|pi_out,baseline|, blended with 100 sigma/sqrt(|pi_1|) below |pi_out,baseline| 2 +- 1

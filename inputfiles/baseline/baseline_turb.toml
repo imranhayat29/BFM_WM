@@ -9,7 +9,7 @@ Verbose = 1             # Verbosity level (0: quiet, 1: informational, 2: debug)
 UseWandb = false       # Whether to use Weights & Biases for experiment tracking (the shipped checkpoint used true)
 Save = true             # Whether to save trained models
 SaveDir = "./models"    # Directory to save models
-GpuNum = 0              # GPU number to use (-1 for CPU)
+GpuNum = 0              # GPU index (train_wm_proposal.py needs a CUDA GPU; -1/CPU is not supported)
 Seed = 1234             # BFM_WM_v2: seeds the train/valid split and weights (the shipped checkpoint was unseeded)
 # WandbName = "Test_inner_att2_nw2000" # Name for the Weights & Biases run
 

@@ -1,6 +1,6 @@
 # A-priori test of the turbulent BFM wall model: baseline + error model + SNGP confidence + EQWM fallback.
 # Defaults reproduce the turbulent-only notebook (TURB-NB, Gaussian bump 2M) with these changes:
-# inference-only gates, magnitudes everywhere, CharLES BFMv2 EQWM law and blend nesting.
+# inference-only gates, magnitudes everywhere, CharLES BFMv2 EQWM law.
 # Run from the repository root:
 #   python test_turb.py test/test_turb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
 # Every key is optional; the values below are the defaults, except [classes]: an omitted PosthocGroups or
@@ -41,7 +41,7 @@ Covariance = "none"  # SNGP mean-field softmax: "none" (variance 1, = CharLES an
 [gates]
 # Three smooth switches (linear ramps Threshold +- Delta, CharLES smoothBlend*), nested as in CharLES BFMv2:
 #   y_final = a_nw*(a_c*(a_a*y_corr + (1-a_a)*y_base) + (1-a_c)*y_fallback) + (1-a_nw)*y_fallback
-Aleatoric  = { Type = "percentage", Threshold = 10.0, Delta = 5.0 }   # Correct where sigma% < 10 +- 5 ("ratio" = sigma/|mu|, notebooks 1.0 +- 0.5)
+Aleatoric  = { Type = "percentage", Threshold = 10.0, Delta = 5.0 }   # Correct where sigma% < 10 +- 5 ("ratio" = sigma/|mu|: also set Threshold 1.0, Delta 0.5 as the notebooks)
 Confidence = { Threshold = 0.7, Delta = 0.05 }    # Keep the NN where the SNGP confidence C > 0.7 +- 0.05, else EQWM fallback
 Yplus      = { Threshold = 4.0, Delta = 2.0 }     # Keep the NN where y+ (EQWM u_tau) > 4 +- 2, else EQWM fallback
 LowValue   = { Threshold = 2.0, Delta = 1.0 }     # sigma%/mu% = 100 q/|pi_out,baseline|, blended with 100 q/sqrt(|pi_1|) below |pi_out,baseline| 2 +- 1
@@ -56,9 +56,9 @@ PosthocGroups = { "APG TBL" = ["APG", "Curved BL APG"], "FPG TBL" = ["FPG", "NAS
 DisplayNames  = { CH = "ZPG TBL", FS_ZPG = "Viscous ZPG", FS_APG = "Viscous APG", FS_FPG = "Viscous FPG", transition_JHU_transition = "Transition BL" }
 
 [plots]
-SpatialMaps = true   # Scatter maps over (x, n1/delta): |e%| baseline/corrected/EQWM, |mu%|, sigma%, C, class labels (map_*)
+SpatialMaps = true   # Scatter maps over (x, n1/delta): |e%| baseline/corrected (blended)/EQWM, |mu%|, sigma%, C, class labels (map_*)
 CfLines     = true   # |C_f| along x at one n1 station per x, raw and moving-averaged (cf_lines, cf_lines_ma)
-Pdfs        = true   # PDFs of |e%| (baseline, corrected, EQWM) and of C (pdf_errors, pdf_confidence)
+Pdfs        = true   # PDFs of |e%| (baseline, corrected = blended, EQWM) and of C (pdf_errors, pdf_confidence)
 Tripcolor   = true   # Smoothed tripcolor maps with OOD / near-wall-fallback hatching (tri_*)
 
 [plots.maps]

@@ -26,7 +26,7 @@ import torch
 
 from src_err import classes as cls
 from src_err import gating
-from src_err.data import DatasetArrays, ktkm_values, load_baseline_model
+from src_err.data import DatasetArrays, baseline_output, ktkm_values, load_baseline_model
 from src_err.evaluation import percent_error, predicted_percent
 from src_err.lamturb import composite_labels, hard_switch, laminar_mask
 
@@ -154,33 +154,6 @@ def class_names_for_plot(turb: BranchModels, lam: Optional[BranchModels] = None)
 # ---------------------------------------------------------------------------------------
 
 
-def batched_baseline(model: Any, X: np.ndarray, batch: int = 65536) -> np.ndarray:
-    """
-    Raw baseline network output pi_out (torch, no-grad, on the model's device)
-
-    Args:
-        model: WallModel (its `.model` is the torch network; inputs are used raw, as the parent)
-        X: (N, D) inputs
-        batch: rows per forward pass
-
-    Returns:
-        (N,) float64 raw outputs (may be negative)
-    """
-    net = model.model
-    net.eval()
-    dev = next(net.parameters()).device
-    X = np.asarray(X)
-    out = np.empty(len(X), dtype=np.float64)
-    with torch.no_grad():
-        for s in range(0, len(X), int(batch)):
-            xb = torch.from_numpy(np.ascontiguousarray(X[s:s + batch])).float().to(dev)
-            out[s:s + batch] = net(xb).reshape(-1).cpu().numpy()
-    if model.config.get("training", {}).get("LogTransform", False):
-        # Parent test path (src/wall_model.py): outputs trained on log(1 + y)
-        out = np.exp(out) - 1.0
-    return out
-
-
 def pi1_abs_from(arrays: DatasetArrays, model_config: Optional[Mapping[str, Any]] = None) -> np.ndarray:
     """
     |pi_1| = |u1| n1 / nu of every point, from the unnormalised inputs U = [n1, u1, nu, ...]
@@ -262,7 +235,7 @@ def branch_predictions(models: BranchModels, X: np.ndarray, cfg: Mapping[str, An
 
     t0 = time.time()
     out: Dict[str, np.ndarray] = {}
-    out["y_base_raw"] = batched_baseline(models.baseline, X)
+    out["y_base_raw"] = baseline_output(models.baseline, X)
     out["y_base"] = np.abs(out["y_base_raw"])
     t1 = time.time()
     out["mu"], out["sigma"] = predict_error(models.error, X)

@@ -298,6 +298,13 @@ def resolve_model_path(name_or_path: str, directory: bool = False) -> str:
     return candidate if found else name_or_path
 
 
+def model_hint(name_or_path: str) -> str:
+    """'<name> (tried ./models/<name>)' for a model name; an absolute path is shown as is."""
+    if os.path.isabs(name_or_path):
+        return name_or_path
+    return f"{name_or_path} (tried {os.path.join('.', 'models', name_or_path)})"
+
+
 def resolve_dataset_file(key: str, files_override: Optional[Mapping[str, str]] = None) -> str:
     """
     h5 file of a dataset key

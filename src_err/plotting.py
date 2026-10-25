@@ -58,7 +58,7 @@ OOD_COLOR = "#4d4d4d"
 # LogNorm(VMin, VMax); 'unit' fields use Normalize(0, 1).
 FIELD_SPECS: Dict[str, Tuple[str, str]] = {
     "baseline": (r"$|\varepsilon_{\mathrm{base}}|\ (\%)$", "log"),
-    "corrected": (r"$|\varepsilon_{\mathrm{corr}}|\ (\%)$", "log"),
+    "corrected": (r"$|\varepsilon_{\mathrm{final}}|\ (\%)$", "log"),  # blended prediction y_final
     "always": (r"$|\varepsilon_{\mathrm{always}}|\ (\%)$", "log"),
     "eqwm": (r"$|\varepsilon_{\mathrm{eqwm}}|\ (\%)$", "log"),
     "mu_pct": (r"$|\mu_{\varepsilon}|\ (\%)$", "log"),

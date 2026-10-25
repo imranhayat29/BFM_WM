@@ -1,0 +1,91 @@
+# config.toml
+
+[general]
+# General settings for the project
+Verbose = 1             # Verbosity level (0: quiet, 1: informational, 2: debug)
+UseWandb = true        # Whether to use Weights & Biases for experiment tracking
+Save = true             # Whether to save trained models
+SaveDir = "./models"    # Directory to save models
+GpuNum = 0             # GPU number to use (-1 for CPU)
+WandbName = "Input2_example"
+
+[data]
+# Datasets
+CH = 1                # 1 to use Channel flow data, 0 otherwise
+SYN = 1               # 1 to use Synthetic data, 0 otherwise
+gaussian_2M_MAPG = 1
+gaussian_2M_APG  = 1
+gaussian_2M_FPG = 1
+gaussian_2M_SEP = 1
+bub_K = 1              
+TBL = [-4, -3, -2, -1, 5, 10, 15]     # List of TBL angles to use
+FS_ZPG = 1
+FS_APG = 1
+FS_FPG = 1
+
+# Data generation settings
+upy = 0.25             # Upper y value for input as a fraction of delta
+
+[data.partition]
+# Data partitioning settings
+TrainRatio = 0.8      # Ratio of data to use for training
+RandomSplitWM = true  # Whether to split data randomly
+
+[model]
+# Model architecture settings
+HiddenLayers = [40, 40, 40, 40] # List defining the number of neurons in each hidden layer
+OutputDim = 1         # Number of output dimensions
+Activation = "relu"   # Activation function for hidden layers (tanh, ReLU, etc.)
+
+[model.inputs]
+InputScaling = 2      # Scaling method for inputs (1, 2, 3, 4, 5, 6, or 7)
+
+[model.outputs]
+OutputScaling = 1     # Scaling method for outputs (0 or 1)
+
+[model.LDS]
+# Label Distribution Smoothing settings
+lds = 0               # 1 to use LDS, 0 otherwise
+reweight = "sqrt_inv" # Reweighting method (none, inverse, sqrt_inv)
+kernel = "gaussian"   # Kernel type for smoothing (gaussian, triang, laplace)
+ks = 5                # Kernel size
+sigma = 2             # Sigma for Gaussian kernel
+num_bins = 100        # Number of bins for histogram
+
+[model.FDS]
+# Feature Distribution Smoothing settings
+fds = 0               # 1 to use FDS, 0 otherwise
+num_layers = 2        # Number of layers for feature extraction network
+num_neurons = 32      # Number of neurons per layer in feature extraction network
+kernel = "gaussian"   # Kernel type for smoothing
+ks = 5                # Kernel size
+sigma = 2             # Sigma for Gaussian kernel
+
+[model.FW]
+# Feature Weighting settings
+fw = 0                # 1 to use feature weighting, 0 otherwise
+
+[model.weights]
+custom = 1            # 1 to use custom weights, 0 otherwise
+
+[training]
+# Training settings
+LossFunction = "Huber"  # Loss function (MSE, L1, Huber)
+
+[training.optimizer]
+# Optimizer settings
+Type = "Adam"         # Optimizer type (Adam, SGD)
+LearningRate = 0.003  # Learning rate
+WeightDecay = 0.000001 # Weight decay
+Momentum = 0.9        # Momentum (for SGD)
+
+[training.scheduler]
+# Learning rate scheduler settings
+Type = "plateau"      # Scheduler type (plateau, step)
+Patience = 25         # Patience for ReduceLROnPlateau
+Factor = 0.98   # Factor for ReduceLROnPlateau
+StepSize = 30         # Step size for StepLR
+Gamma = 0.1           # Gamma for StepLR
+Epochs = 20000         # Number of training epochs
+PrintInterval = 200    # Print loss every N epochs
+SaveInterval = 1000    # Save model every N epochs

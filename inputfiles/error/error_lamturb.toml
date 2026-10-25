@@ -1,0 +1,100 @@
+# Error models of the laminar-turbulent BFM wall model (one per branch).
+# Replaces the error-model cells of BFMWM_ErrorModel copy_aairfoil2M-LamTurbModel-cleaned4context2.ipynb (LT-NB,
+# cells 34-42), which had to be run once per pipeline by hand.
+#
+# Train with (from the repository root):
+#   python train_lamturb.py --error error/error_lamturb.toml [--sngp sngp/sngp_lamturb.toml] [--branch lam|turb|both]
+#
+# [lam] and [turb] are each a complete config with the keys of error/error_turb.toml (see the comments there).
+# The shared [general] table is inherited by both branches where they don't set a key; ModelName is per branch.
+# Kt/Km is not used in training (the lam/turb hard switch is applied at test time / in CharLES).
+
+[general]
+SaveDir   = "./models"   # directory receiving <ModelName>/ and checkpoints/<ModelName>/
+Save      = true         # false: train and write diagnostics only
+Overwrite = false        # true: replace existing model directories and snapshots
+GpuNum    = 0            # GPU index; -1 = CPU (the CLI option --gpu overrides it)
+Seed      = 1234         # seeds splits, weights and shuffling
+
+# =====================================================================================================
+# Laminar branch
+# =====================================================================================================
+[lam.general]
+# Shipped model (models/, read-only), for reference:
+#   error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000
+ModelName = "error_model_lam_v2"
+
+[lam.baseline]
+Checkpoint = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
+
+[lam.data]
+# Laminar A-airfoil extraction up to n1/delta = 1 (from 0.005): the data of the shipped model ('UPY1' in its
+# name). Its normalisation statistics match these files. The laminar SNGP uses the narrower
+# down0p02_up0p8 extraction instead (sngp/sngp_lamturb.toml).
+AddDatasets = ["aairfoil_2M_full2Dfield_down0p005_up1_laminar_ZPG",
+               "aairfoil_2M_full2Dfield_down0p005_up1_laminar_APG",
+               "aairfoil_2M_full2Dfield_down0p005_up1_laminar_FPG"]
+TrainRatio = 0.8
+upy   = 1.0              # no upper n1/delta cut
+downy = 0.0              # no lower cut
+
+[lam.data.Files]
+
+[lam.model]
+HiddenLayers = [60, 60, 60, 60, 60, 60]   # 6 x 60 (CharLES hard-codes 6 hidden layers of 60 for the laminar error model)
+SigmaFloor   = 1.0e-4
+
+[lam.training]
+Epochs          = 4000       # LT-NB epochs for 'lam' (shipped: best epoch 3985 of 4000, restored)
+BatchSize       = 50000
+LearningRate    = 1.0e-3
+EndLearningRate = 8.0e-5
+DecayFraction   = 0.6666667
+
+[lam.training.EarlyStopping]
+RestoreBestWeights = true
+Patience = 0                 # 0 = never stop early
+MinDelta = 0.0
+
+[lam.training.Snapshots]
+SaveInterval = 1000          # SavedModel every N epochs in <SaveDir>/checkpoints/<ModelName>/; 0 = off
+
+# =====================================================================================================
+# Turbulent branch: same recipe as error/error_turb.toml
+# =====================================================================================================
+[turb.general]
+# Shipped model (models/, read-only), for reference:
+#   error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811
+ModelName = "error_model_lamturb_turb_v2"
+
+[turb.baseline]
+Checkpoint = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+
+[turb.data]
+AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",
+               "hump_APG_SEP2", "naca_0012", "naca_4412_1", "naca_4412_2", "naca_4412_4", "naca_4412_10",
+               "aairfoil_2M"]
+TrainRatio = 0.8
+upy   = 0.15
+downy = 0.0
+
+[turb.data.Files]
+
+[turb.model]
+HiddenLayers = [60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60]   # 15 x 60
+SigmaFloor   = 1.0e-4
+
+[turb.training]
+Epochs          = 10000      # shipped 'ep3811' = best epoch of a 10000-epoch run
+BatchSize       = 50000
+LearningRate    = 1.0e-3
+EndLearningRate = 8.0e-5
+DecayFraction   = 0.6666667
+
+[turb.training.EarlyStopping]
+RestoreBestWeights = true
+Patience = 0
+MinDelta = 0.0
+
+[turb.training.Snapshots]
+SaveInterval = 1000

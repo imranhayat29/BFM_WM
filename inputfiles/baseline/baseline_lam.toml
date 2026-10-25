@@ -1,0 +1,87 @@
+# Baseline BFM wall model, laminar branch of the laminar-turbulent workflow.
+# This is the configuration embedded in the shipped checkpoint
+# models/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth
+# (input2_laminar.toml with downy = 0.005 added at training time; with upy >= 1 the parent loader applies no y window).
+# Train with:  python train_wm_proposal.py baseline/baseline_lam.toml
+
+[general]
+Verbose = 1
+UseWandb = false   # the shipped checkpoint used false
+Save = true
+SaveDir = "./models"
+GpuNum = 0         # the shipped checkpoint was trained on GPU 1
+Seed = 1234        # BFM_WM_v2: seeds the train/valid split and weights (the shipped checkpoint was unseeded)
+WandbName = "Input2_laminar"
+
+[data]
+# Keep only laminar-like training cases here (edit as needed)
+CH = 0
+SYN = 0
+gaussian_2M_MAPG = 0
+gaussian_2M_APG  = 0
+gaussian_2M_FPG = 0
+gaussian_2M_SEP = 0
+bub_K = 0
+TBL = []
+FS_ZPG = 1
+FS_APG = 1
+FS_FPG = 1
+
+upy = 1.25
+downy = 0.005
+
+[data.partition]
+TrainRatio = 0.8
+RandomSplitWM = true
+
+[model]
+HiddenLayers = [40, 40, 40, 40]
+OutputDim = 1
+Activation = "relu"
+
+[model.inputs]
+InputScaling = 2
+
+[model.outputs]
+OutputScaling = 1
+
+[model.LDS]
+lds = 0
+reweight = "sqrt_inv"
+kernel = "gaussian"
+ks = 5
+sigma = 2
+num_bins = 100
+
+[model.FDS]
+fds = 0
+num_layers = 2
+num_neurons = 32
+kernel = "gaussian"
+ks = 5
+sigma = 2
+
+[model.FW]
+fw = 0
+
+[model.weights]
+custom = 1
+
+[training]
+LossFunction = "Huber"
+
+[training.optimizer]
+Type = "Adam"
+LearningRate = 0.003
+WeightDecay = 0.000001
+Momentum = 0.9
+
+[training.scheduler]
+Type = "plateau"
+Patience = 25
+Factor = 0.98
+StepSize = 30
+Gamma = 0.1
+Epochs = 30000
+PrintInterval = 200
+SaveInterval = 1000

@@ -1,0 +1,110 @@
+# SNGP flow-type classifier / confidence model of the turbulent-only BFM wall model.
+# Replaces the SNGP cells of BFMWM_ErrorModel copy_gaussian2M_cleaned4context.ipynb (TURB-NB, cells 14-24).
+#
+# Train with (from the repository root):
+#   python train_turb.py --sngp sngp/sngp_turb.toml [--error error/error_turb.toml] [--gpu N] [--smoke]
+#
+# The SNGP classifies the baseline inputs X = [pi1, pi2, pi3] (InputScaling 2) into the flow types it was
+# trained on; its normalised-entropy "one-class" confidence C = 1 - H(q)/ln(K - K_tr + 1) drives the
+# CONFIDENCE switch of the wall model (K = NumClasses, K_tr = trained classes).
+# All class operations below use class NAMES (validated); the integer labels are derived from them.
+
+[general]
+# Output directory name under SaveDir (required). Shipped models (models/, read-only), for reference:
+#   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged   (TURB-NB, this recipe with 5000 epochs)
+#   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged   (LT-NB turb branch; used by CharLES and the test scripts)
+ModelName = "sngp_model_turb_v2"
+SaveDir   = "./models"   # directory receiving <ModelName>/ (SavedModel + assets/metadata.json, history.json, split_indices.npz)
+Save      = true         # false: train and write diagnostics only (notebook flag save_sngp_flag)
+Overwrite = false        # true: replace an existing <SaveDir>/<ModelName> (otherwise the script stops before training)
+GpuNum    = 0            # GPU index for TensorFlow and torch; -1 = CPU (the CLI option --gpu overrides it)
+Seed      = 1234         # seeds the baseline train/valid split (if the checkpoint stores none), the 80/20 split of the
+                         # additional datasets, weight initialisation, shuffling and dropout (required)
+
+[baseline]
+# Baseline wall-model checkpoint (file in ./models or a path; required). Its embedded config defines the baseline
+# training datasets (= the first SNGP classes, in checkpoint order) and the input scaling.
+# The SNGP/error model see the baseline's own train/valid split: stored indices of new checkpoints, otherwise
+# the parent split re-drawn with Seed (the notebooks re-drew it unseeded in every session).
+Checkpoint = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+
+[data]
+# Additional datasets (registry keys of wall_model_cases.py / ./data/<key>_data.h5), appended as extra classes
+# named by the h5 'case_name' column (e.g. hump_FPG -> 'FPG', aairfoil_2M -> 'airfoil'). [] = baseline data only
+# (notebook flag include_extra_data_flag). TURB-NB "Expert ExtFlow" set:
+AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",
+               "hump_APG_SEP2", "naca_0012", "naca_4412_1", "naca_4412_2", "naca_4412_4", "naca_4412_10",
+               "aairfoil_2M"]
+TrainRatio = 0.8         # fraction of the additional-data points in the train part (seeded 80/20 split)
+upy   = 0.15             # upper wall-distance cut n1/delta <= upy for the additional datasets (>= 1: no upper cut);
+                         # TURB-NB used the checkpoint's upy = 0.15
+downy = 0.0              # lower cut n1/delta >= downy (honoured whenever > 0); TURB-NB set downy = 0
+DownsampleBaseline = 1   # keep every N-th point of the baseline train/valid part (extras are never strided)
+                         # (LT-NB downsample_sngp_data_factor)
+RecomputeNorm = false    # false: z-score with the full baseline-train statistics (TURB-NB);
+                         # true: recompute them over (strided baseline + additional) train data
+                         # (LT-NB recompute_norm_with_extra_flag)
+
+[data.Files]
+# Optional explicit h5 paths for dataset keys not found in ./data, e.g.
+# naca_0012 = "../BFM_WM/data/naca_0012_data.h5"
+
+[classes]
+NumClasses = 50          # GP output units (> trained classes; the untrained units act as OOD sinks). CharLES expects 50.
+# Classes dropped before training (combined-class names; TURB-NB labels_to_remove = [1,21,24,25,26,27,28]):
+RemoveClasses = ["SYN", "airfoil", "naca_0012_top4n12", "naca_4412_top1n", "naca_4412_top2n", "naca_4412_top4n",
+                 "naca_4412_top10n"]
+
+[classes.MergeGroups]
+# Pre-training merge: group name = [member class names]. Label order = groups in this order, then the ungrouped
+# classes in combined order (TURB-NB group_definitions; merge_groups_flag = 1). {} = no merging.
+APG = ["gaussian_2M_MAPG", "gaussian_2M_APG", "TBL_5", "TBL_10", "TBL_15", "TBL_20"]
+FPG = ["gaussian_2M_FPG", "TBL_-4", "TBL_-3", "TBL_-2", "TBL_-1"]
+SEP = ["gaussian_2M_SEP", "bub_K"]
+"NASA Hump FPG" = ["FPG"]
+"NASA Hump SEP" = ["APG_SEP2", "FPG_SEP"]
+"Curved BL FPG" = ["curved_BL_FPG"]
+"Curved BL APG" = ["curved_BL_APG"]
+
+[classes.DisplayNames]
+# Display names of trained classes / post-hoc groups (plots only; stored in the metadata; TURB-NB rename_mapping).
+# Keys that match no class are ignored.
+APG = "Turbulent APG"
+FPG = "Turbulent FPG"
+SEP = "Turbulent Separation"
+CH = "ZPG TBL"
+FS_ZPG = "Viscous ZPG"
+FS_APG = "Viscous APG"
+FS_FPG = "Viscous FPG"
+transition_JHU_transition = "Transition BL"
+"APG TBL" = "APG TBL"
+"FPG TBL" = "FPG TBL"
+Separation = "Separation"
+
+[classes.PosthocGroups]
+# Post-hoc groups of trained classes, used for labels/plots at test time only (the confidence always uses the
+# un-merged classes); stored in the metadata (TURB-NB posthoc_group_definitions, apply_posthoc_merging).
+"APG TBL" = ["APG", "Curved BL APG"]
+"FPG TBL" = ["FPG", "NASA Hump FPG", "Curved BL FPG"]
+"Separation" = ["SEP", "NASA Hump SEP"]
+
+[model]
+# Architecture. CharLES BFMv2 hard-codes 6 / 128 / 0.9 / 1024 / 1.0; other values print a warning and the
+# exported model would not run in CharLES.
+NumLayers     = 6        # residual blocks
+NumHidden     = 128      # width of the (frozen) input layer and the residual blocks
+SpecNormBound = 0.9      # spectral-norm bound of the residual layers
+NumInducing   = 1024     # random Fourier features of the GP output layer
+GpKernelScale = 1.0      # RBF kernel length scale of the GP layer
+Dropout       = 0.1      # dropout rate of the residual blocks
+DropoutActive = true     # true: dropout applied in training (v2); false: never applied (shipped models, whose
+                         # dropout was inactive because `training` was not propagated)
+
+[training]
+Epochs          = 5000       # training epochs (required; TURB-NB 5000)
+BatchSize       = 50000      # samples per optimiser step
+LearningRate    = 5.0e-4     # initial Adam learning rate (linear PolynomialDecay ...)
+EndLearningRate = 1.0e-4     # ... down to this value
+DecayUnit       = "epoch"    # "epoch": decay over all Epochs (v2 default); "step": decay_steps = Epochs optimiser
+                             # steps, i.e. the floor is reached early (reproduces the shipped models)
+ClassWeights    = "balanced" # "balanced": sklearn inverse-frequency class weights (notebooks); "none"

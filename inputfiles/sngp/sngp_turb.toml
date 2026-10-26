@@ -10,7 +10,7 @@
 # All class operations below use class NAMES (validated); the integer labels are derived from them.
 
 [general]
-# Output directory name under SaveDir (required). Reference models (./models/, read-only), for comparison:
+# Output directory name under SaveDir (required). Reference models (./models/sngp/, read-only), for comparison:
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged   (this recipe, 5000 epochs)
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged   (this recipe, 4000 epochs; the turbulent SNGP
 #                                                                       deployed in CharLES BFMv2 and used by the test scripts)

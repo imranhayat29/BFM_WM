@@ -36,9 +36,10 @@ laminar variants can be linked together, and their headers declare the sizes as 
 
 **Where to write.** The examples below export the turbulent reference models (the pretrained models in `./models/sngp/`, `./models/error/` and `./models/baseline/`)
 into `./results/export/` (git-ignored); every exporter creates the parent directories of its outputs. Do not write
-into the reference model directories: their `assets/` already hold the bundles of the reference models
-(`sngp_params.npz`, `sngp_params_meta.json`, `error_model_params.json`). The examples reproduce these files
-(`error_model_params.json` differs only in the absolute `model_dir` it records).
+into the reference model directories: the `assets/` of the exported reference models (the 4000-epoch turbulent
+and the laminar SNGP, both error models) already hold their bundles (`sngp_params.npz`, `sngp_params_meta.json`,
+`error_model_params.json`). The examples reproduce these files (`error_model_params.json` differs only in the
+`model_dir` it records).
 
 ### `export_sngp_to_npz.py`
 

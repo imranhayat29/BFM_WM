@@ -94,7 +94,13 @@ docs/DEVELOPMENT.md      developer notes (see Development notes)
   if that interpreter is missing on the node. If environment modules put other Python packages on `PYTHONPATH`,
   run `unset PYTHONPATH` before creating, filling and activating the venv; those packages would shadow the
   venv's.
-- **Data and reference models** are stored with git-lfs (about 1.1 GB): `git lfs install --local && git lfs pull`.
+- **Getting the code, data and reference models.** The data and the reference models are stored with git-lfs, so
+  install [git-lfs](https://git-lfs.com) first. Then:
+  ```bash
+  git clone -b v2 https://github.com/imranhayat29/BFM_WM.git BFM_WM_v2
+  cd BFM_WM_v2
+  git lfs install --local && git lfs pull     # about 1.1 GB to download, about 2.2 GB on disk
+  ```
 - Run all scripts from the repository root. Paths are relative to it: `./inputfiles`, `./models`, `./data`,
   `./results`.
 - `TF_USE_LEGACY_KERAS=1` is set automatically by `src_err` before TensorFlow is imported.
@@ -117,10 +123,10 @@ Data are stored in `data/` directories. They cover data summarized in [Table](ht
 - **Dataset lookup.** The TOMLs name datasets by key. A key is resolved to a file in this order: an explicit
   path in the TOML's `[data.Files]` table, `./data/<key>_data.h5`, then the entry in `wall_model_cases.py`.
 - **Lam-turb test set.** `aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5`, the default test
-  set of `test_lamturb.py`, is **not included** in this repository (contact the maintainers to obtain it). It is
+  set of `test_lamturb.py`, is **not included** in this repository (contact the repository owner to obtain it). It is
   a full 2D-field extraction of the A-airfoil at Re = 2M, with the `kt_km` column. Place the file, or a link to
-  it, in `data/` under that name (it is git-ignored there), or give its path in the `[data.Files]` table of the
-  test TOML.
+  it, in `data/` under exactly that name (it is git-ignored there), or give its path in the `[data.Files]` table
+  of the test TOML.
 - `wall_model_cases.py` also registers keys whose files are not included (the comment at the top of the file
   lists them). Place such files in `data/` or give their paths in `[data.Files]` to use them.
 
@@ -308,6 +314,7 @@ The scripts use one GPU (`--gpu 0` inside a job). Example job script, submitted 
 ```bash
 #!/bin/bash
 #SBATCH -A <account> -p <gpu-partition> --gres=gpu:1 -c 8 --mem=48G -t 08:00:00
+unset PYTHONPATH                      # if environment modules set it (see Setup)
 source <path-to-venv>/bin/activate
 export OMP_NUM_THREADS=8 TF_NUM_INTRAOP_THREADS=8 TF_NUM_INTEROP_THREADS=2
 python train_turb.py --sngp sngp/sngp_turb.toml --gpu 0
@@ -367,7 +374,7 @@ to the wrong script or option is reported as such.
 
 | TOML | Read by | Content |
 |---|---|---|
-| `baseline/baseline_turb.toml`, `baseline/baseline_lam.toml`, `input2_example.toml` | `train_wm_proposal.py` | baseline training (upstream format, see `src/README.md`) |
+| `baseline/baseline_turb.toml`, `baseline/baseline_lam.toml`, `input2_example.toml` | `train_wm_proposal.py` | baseline training (upstream format; every key is commented in `input2_example.toml`) |
 | `sngp/sngp_turb.toml` | `train_turb.py --sngp` | turbulent SNGP |
 | `error/error_turb.toml` | `train_turb.py --error` | turbulent error model |
 | `sngp/sngp_lamturb.toml` | `train_lamturb.py --sngp` | laminar and turbulent SNGPs |
@@ -474,6 +481,10 @@ This generates:
 - CSV file with performance metrics
 - HTML table visualization showing performance across datasets
 
+The upstream tools write to `./results/`, `./paper_plots/`, `./dummy/`, `./testing_results/` and `./tables/`
+(created when needed, git-ignored), and their plots use LaTeX text rendering (matplotlib `text.usetex`), so a LaTeX
+installation is needed for them. The scripts of this repository do not need LaTeX.
+
 ## Changes relative to upstream
 
 | File | Change |
@@ -484,9 +495,10 @@ This generates:
 | `src/README.md` | New section listing the changes to `src/`. |
 | `train_wm_proposal.py` | Raises `RuntimeError` instead of a string. Optional `[general] Seed`. |
 | `wall_model_cases.py` | Additional dataset keys (A-airfoil full 2D fields and their laminar sets, NASA hump regions, a-posteriori LES sets, ...). Keys whose files are not included are listed at the top of the file. |
-| `plot_utils.py` | No longer loads a personal matplotlib style file. |
+| `plot_utils.py`, `src/plot_utils.py`, `src/visualization.py` | No longer load a personal matplotlib style file. |
+| `test_model.py`, `test_model_summary_table.py`, `src/wall_model.py` | Create their output folders when needed. The summary table keeps dots in the checkpoint name and accepts a model subfolder (e.g. `baseline/<checkpoint>.pth`). |
 | `requirements.txt` | New: the pinned Python 3.11 environment. |
-| `.gitignore` | `inputfiles/` and the reference models in `models/` are tracked; models trained locally, `docs/dev_local/` (local developer files) and a local copy of the lam-turb test set are ignored. |
+| `.gitignore` | `inputfiles/` and the reference models in `models/` are tracked; models trained locally, `docs/dev_local/` (local developer files), a local copy of the lam-turb test set and the output folders of the upstream testing tools are ignored. |
 | `models/` | Reference models tracked with git-lfs (`models/.gitattributes`), in `baseline/`, `sngp/` and `error/`; upstream keeps `models/` out of git. |
 | `data/` | See [Data](#data). |
 | `README.md` | `test_model.py` takes `--model_path` (the old usage line was out of date). |

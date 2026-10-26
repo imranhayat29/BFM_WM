@@ -30,3 +30,7 @@ docs/dev_local/
 !/models/error/error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000/
 # Lam-turb test set (not distributed): a local copy or link in data/ must not be committed
 /data/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5
+# Outputs of the upstream baseline testing tools (test_model.py, test_model_summary_table.py)
+testing_results/
+tables/
+paper_plots/

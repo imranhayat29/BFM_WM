@@ -75,9 +75,11 @@ a-posteriori class import, ...) were not ported. To read a notebook as a script:
   10. Reproduction of the reference models ([section 12](#12-reproduction-of-the-reference-models-with-v2))
   11. GPU-node environment (README)
   12. The all-cases test moved to the root as `test_turb_allcases.py`
-  13. Later commits: the reference models in git-lfs (`models/baseline|sngp|error/`), no personal paths
-- All commits are authored as `Imran Hayat <ihayat@caltech.edu>`; before the first push the history was rewritten once
-  to set that address and once to remove machine-specific paths, so the hashes of a local pre-push clone differ.
+  13. Later commits: the reference models in git-lfs (`models/baseline|sngp|error/`), no personal paths or cluster
+      specifics, fixes for fresh clones
+- All commits of `v2` on top of upstream are authored as `Imran Hayat <ihayat@caltech.edu>`; before the first push the
+  history was rewritten to set that address and to remove machine-specific paths and cluster details, so the hashes of a
+  local pre-push clone differ.
 - To follow upstream: `git fetch upstream && git merge upstream/master` on `v2`. Parent files were changed as
   little as possible (D4) so that this stays easy; every change is marked `# BFM_WM_v2:` (see [11.4](#114-conventions)).
 
@@ -654,20 +656,22 @@ above are the part worth keeping.
 
 ## 11. Development notes
 
-### 11.1 Environment on the cluster
+### 11.1 Environment
 
-- The owner's shared venv `torch-venv` (8.5 GB; location in `docs/dev_local/LOCAL_PATHS.md`). Its `bin/activate` unsets
-  `PYTHONPATH`, because the auto-loaded modules put Python 3.10 packages there that shadow the venv's (numpy import
-  error). Build any new venv with `env -u PYTHONPATH`.
-- Base interpreter: the shared cluster Python 3.11.6 (`module load <python3.11 module>`), which exists on
-  the login and the GPU nodes. Until 2026-10-25 it was `/usr/bin/python3.11`, which exists on the login nodes only
-  (the GPU nodes have `/usr/bin/python3.9`). The first five GPU jobs therefore failed with `No module named
-  numpy/torch`, and the trainings of [section 12](#12-reproduction-of-the-reference-models-with-v2) ran the venv's
-  packages with the cluster Python through `PYTHONPATH`. The venv was then re-pointed to the cluster Python with
-  `venv --upgrade --without-pip` (packages and `activate` untouched; the changed files are backed up next to the
-  venv, see `docs/dev_local/LOCAL_PATHS.md`). Plain `source .../activate` was then checked
-  in a P100 job, and CPU results were bit-identical to those under the old interpreter.
-- If that cluster build ever disappears, re-point the venv to another CPython 3.11 (the compiled packages are cp311):
+Cluster-specific details (module names, interpreter paths, Slurm account and partitions) are in the git-ignored
+`docs/dev_local/LOCAL_PATHS.md`.
+
+- The owner's shared venv `torch-venv` (8.5 GB). Its `bin/activate` unsets `PYTHONPATH`, because the cluster's
+  auto-loaded modules put Python 3.10 packages there that shadow the venv's (numpy import error). Build any new venv
+  with `env -u PYTHONPATH`.
+- Base interpreter: a Python 3.11 from an environment module, which exists on the login and the GPU nodes. Until
+  2026-10-25 it was the system `/usr/bin/python3.11`, which exists on the login nodes only (the GPU nodes have
+  `/usr/bin/python3.9`). The first five GPU jobs therefore failed with `No module named numpy/torch`, and the
+  trainings of [section 12](#12-reproduction-of-the-reference-models-with-v2) ran the venv's packages with the module
+  Python through `PYTHONPATH`. The venv was then re-pointed to the module Python with `venv --upgrade --without-pip`
+  (packages and `activate` untouched; the changed files are backed up next to the venv). Plain `source .../activate`
+  was then checked in a GPU job, and CPU results were bit-identical to those under the old interpreter.
+- If that interpreter ever disappears, re-point the venv to another CPython 3.11 (the compiled packages are cp311):
   `rm <venv>/bin/python3.11 && <python3.11> -m venv --upgrade --without-pip <venv>`.
 - Login node: limit threads (`OMP_NUM_THREADS=2 TF_NUM_INTRAOP_THREADS=2 TF_NUM_INTEROP_THREADS=1`); keep checks
   light. No Slurm submission without the owner's approval.
@@ -765,7 +769,7 @@ sys.exit(1 if bad else 0)
 ### 11.5 Open items
 
 - Input sign frame ([9.3](#93-remaining-difference-the-input-sign-frame)).
-- The lam-turb test set and the reference models are available only on the cluster.
+- The lam-turb test set is not distributed (only the owner has a copy); the reference models are in git-lfs.
 - Output naming: "corrected" in test outputs means the blended prediction (kept from the notebooks); a rename to
   "blended" would need the alias kept for old TOMLs.
 - The CharLES copies of the exported data files still need the `#define` suffix edits by hand.
@@ -776,7 +780,7 @@ sys.exit(1 if bad else 0)
 
 ### 12.1 Trainings
 
-The default training TOMLs as of the final-review commit (`annotated-tomls`), trained on P100 GPUs (normal QOS) on 2026-10-25 with the cluster job recipe
+The default training TOMLs as of the final-review commit (`annotated-tomls`), trained on P100 GPUs (normal QOS) on 2026-10-25 with the GPU job recipe
 of the README. The `[turb]` branch of `error_lamturb.toml` has the same recipe and seed as `error_turb.toml` and was not
 trained separately. Outputs: `*_v2` models in the owner's working copy (git-ignored; `models/sngp/` and `models/error/`).
 
@@ -797,7 +801,7 @@ trained separately. Outputs: `*_v2` models in the owner's working copy (git-igno
 ### 12.2 A-priori comparison
 
 Both test scripts on their full test sets and the full benchmark, once with the reference models and once with the v2
-models (GPU, 20 min). The scratch files are in `results/compare/` on the cluster (`run_compare.sh`, the TOML copies,
+models (GPU, 20 min). The scratch files are in the owner's working copy, `results/compare/` (`run_compare.sh`, the TOML copies,
 `compare_report.py`). Mean |e| in %; for the A-airfoil the medians are in parentheses.
 
 | Test | Models (SNGP + error model) | Baseline | Blended | Always-corrected | C mean | Fully corrected |

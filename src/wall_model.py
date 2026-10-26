@@ -798,6 +798,8 @@ class WallModel(WallModelBase):
                         'unnormalized_inputs': unnormalized_inputs,
                         'flow_type': flow_type
                     }
+                    # BFM_WM_v2: create the folder (not in the repository); upstream assumed it existed
+                    os.makedirs('./paper_plots/results_for_plotting_spatial', exist_ok=True)
                     with open(f'./paper_plots/results_for_plotting_spatial/{dataset_key}_results.pkl', 'wb') as f:
                         pkl.dump(results_to_save, f)
                 

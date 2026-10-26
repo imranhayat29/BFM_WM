@@ -1,9 +1,8 @@
 """
 Train the SNGP confidence model and/or the error model of the turbulent-only BFM wall model
 
-Replaces the training cells of the notebook `BFMWM_ErrorModel copy_gaussian2M_cleaned4context.ipynb`
-(SNGP: cells 14-24, error model: cells 30-35). The baseline wall model itself is trained with
-train_wm_proposal.py; this script takes its checkpoint ([baseline] Checkpoint) as input.
+The baseline wall model itself is trained with train_wm_proposal.py; this script takes its checkpoint
+([baseline] Checkpoint) as input.
 
 Usage (from the repository root):
     python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml [--gpu N] [--smoke]
@@ -17,6 +16,8 @@ Usage (from the repository root):
 
 Outputs: <SaveDir>/<ModelName> (SavedModel + assets/), diagnostics in results/training/<ModelName>/.
 """
+# Provenance: replaces the training cells of TURB-NB (SNGP: cells 14-24, error model: cells 30-35);
+# see docs/DEVELOPMENT.md.
 import sys
 
 from src_err import utils  # sets the TensorFlow environment before TF is imported

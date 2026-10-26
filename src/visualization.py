@@ -135,7 +135,8 @@ class WallModelVisualization:
         from scipy.ndimage import gaussian_filter
 
         # Override some matplotlib settings for better aesthetics
-        plt.style.use('~/Codes/matplotlibstyle/mystyle.mplstyle')
+        # BFM_WM_v2: personal style file is not part of the repo, so it is not loaded (upstream loaded it here)
+        # plt.style.use('~/Codes/matplotlibstyle/mystyle.mplstyle')
         plt.rcParams.update({
             "text.usetex": True,
         })

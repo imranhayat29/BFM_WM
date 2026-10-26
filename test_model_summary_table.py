@@ -135,6 +135,9 @@ log_abs_error = []
 
 abs_error = []
 
+# BFM_WM_v2: create the output folders (they are not in the repository); upstream assumed they existed
+os.makedirs('./dummy/', exist_ok=True)
+
 for test_dataset in test_datasets:
 # Test each dataset
     print(f"\nTesting on {test_dataset}...")
@@ -192,11 +195,14 @@ df_abs = pd.DataFrame(data_abs)
 
 # # Save testing results to CSV
 # Remove extension from model name
-model_name = model_name.split('.')[0]
+# BFM_WM_v2: splitext keeps dots inside the checkpoint name (upstream: split('.')[0]); the name may contain a
+# subfolder of ./models (e.g. baseline/), which is created under ./testing_results and ./tables
+model_name = os.path.splitext(model_name)[0]
+os.makedirs(os.path.dirname(f'./testing_results/{model_name}.csv'), exist_ok=True)
+os.makedirs(os.path.dirname(f'./tables/{model_name}_test.html'), exist_ok=True)
 with open(f'./testing_results/{model_name}.csv', 'w') as f:
     pd.DataFrame(data).to_csv(f, index=False)
 
-model_name = model_name.split('.')[0]
 with open(f'./testing_results/{model_name}_abs.csv', 'w') as f:
     pd.DataFrame(data_abs).to_csv(f, index=False)
 

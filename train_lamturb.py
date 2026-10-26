@@ -1,15 +1,13 @@
 """
 Train the SNGP confidence models and/or the error models of the laminar-turbulent BFM wall model
 
-Replaces the training cells of the notebook
-`BFMWM_ErrorModel copy_aairfoil2M-LamTurbModel-cleaned4context2.ipynb` (cells 14-42), which had
-to be run twice by hand (once per pipeline). Here the lam-turb TOMLs hold a [lam] and a [turb]
-table, each a complete turbulent-only-style config (shared [general] values are inherited), and
-each selected branch runs the same pipeline as train_turb.py with its own baseline checkpoint:
+The lam-turb TOMLs hold a [lam] and a [turb] table, each a complete turbulent-only-style config
+(shared [general] values are inherited), and each selected branch runs the same pipeline as
+train_turb.py with its own baseline checkpoint:
 
     lam : laminar baseline (FS_ZPG/APG/FPG), laminar A-airfoil additional data, n1/delta <= 0.8
           (SNGP) / no upper cut (error model), DownsampleBaseline 10, RecomputeNorm, 30 SNGP units;
-    turb: as train_turb.py (SNGP 4000 epochs in the shipped lam-turb set).
+    turb: as train_turb.py (SNGP 4000 epochs).
 
 Kt/Km is not used in training: each branch is trained on its own data only, and the Kt/Km
 hard switch between the branches is applied at test time (test_lamturb.py) and in CharLES.
@@ -22,6 +20,8 @@ Usage (from the repository root):
     --gpu N    GPU index for torch and TensorFlow (overrides [general] GpuNum; -1 = CPU)
     --smoke    login-node smoke test (2 epochs, capped samples, ./results/smoke/)
 """
+# Provenance: replaces the training cells of LT-NB (cells 14-42), which had to be run once per branch by
+# hand; see docs/DEVELOPMENT.md.
 import sys
 
 from src_err import utils  # sets the TensorFlow environment before TF is imported

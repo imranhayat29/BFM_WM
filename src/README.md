@@ -52,7 +52,7 @@ This folder contains a modular redesign of the wall model class to improve maint
 ### Training a new model:
 
 ```python
-from proposal.wall_model import WallModel
+from src.wall_model import WallModel
 
 # Define configuration
 config = {
@@ -86,7 +86,7 @@ r2_train, r2_valid = wall_model.test(save_path='./results')
 ### Testing an existing model:
 
 ```python
-from proposal.wall_model import WallModel
+from src.wall_model import WallModel
 
 # Load model
 wall_model = WallModel.load_compact('models/my_model.pth', device="cpu")
@@ -117,7 +117,7 @@ To migrate from the old monolithic class to the new modular design:
    from wall_model_class import TrainingWallModelClass
    
    # New
-   from proposal.wall_model import WallModel
+   from src.wall_model import WallModel
    ```
 
 2. Loading models:
@@ -160,5 +160,8 @@ This repository (BFM_WM_v2) changes these behaviours relative to upstream. Each 
   - `load_data()` sets `model.flow_type` (the per-sample dataset names used as SNGP class labels).
   - The near-wall test plots invert the signed log1p exactly.
   - `train()` passes the train/valid split indices to the trainer.
+  - `test_external_dataset()` creates `./paper_plots/results_for_plotting_spatial/` before saving results there.
 - `trainer.py`: checkpoints store `train_index`/`valid_index` as int64 tensors. They are absent in
   upstream and older checkpoints.
+- `plot_utils.py`, `visualization.py`: the personal matplotlib style file is no longer loaded.
+- This README: the usage examples import `src.wall_model` (upstream wrote `proposal.wall_model`).

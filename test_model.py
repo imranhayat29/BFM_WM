@@ -39,6 +39,12 @@ mask_threshold = args.mask_threshold
 mask_threshold_Re = args.mask_threshold_Re
 save_results = bool(args.save_results)
 
+# BFM_WM_v2: create the output folders (they are not in the repository); upstream assumed they existed
+if save_mode:
+    os.makedirs('./results', exist_ok=True)
+if save_results:
+    os.makedirs('./paper_plots/results_for_plotting_spatial', exist_ok=True)
+
 if mask_threshold_Re is not None and mask_threshold is not None:
     print("Warning: as mask_threshold_Re is provided, mask_threshold will be ignored.")
     mask_threshold = None
@@ -110,6 +116,7 @@ while True:
         if wall_model is None:
             results, wall_model = load_and_test_model(model_path, 'SYN')
         wall_model.load_data()
+        os.makedirs('./paper_plots/regression', exist_ok=True)  # BFM_WM_v2: not in the repository
         wall_model.test(plot=False,plot_frequency=True, save_path="./paper_plots/regression/")
         continue
     elif test_dataset == 'Q':

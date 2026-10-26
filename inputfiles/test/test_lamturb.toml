@@ -18,7 +18,7 @@ GpuNum     = 0                        # GPU index for torch and TensorFlow (-1 =
 SaveArrays = false                    # Also write arrays.npz with every per-point field (predictions, errors, x, n1, ...)
 
 [switch]
-KtKmThreshold = 0.002   # A point is laminar iff kt_km <= threshold (CharLES KT_KM_THRESHOLD); kt_km from the flow_type
+KtKmThreshold = 0.005   # A point is laminar iff kt_km <= threshold (CharLES KT_KM_THRESHOLD); kt_km from the flow_type
                         # column 'kt_km', else inferred from the flow name ('laminar'/'fs_' -> 0, 'transition' -> 0.5, else 1)
 
 [turb.models]
@@ -45,10 +45,8 @@ DisplayNames  = {}   # Identity
 
 [data]
 # Test dataset: the full 2D-field extraction of the A-airfoil 2M case (wall-normal profiles from the leading edge
-# to the trailing edge, x/c in [0, 1.01], with the kt_km column). It is NOT included in the repository (./data/
-# holds training data only): place the file (or a link to it) in ./data/ under its key name, or give its path
-# in [data.Files].
-Datasets   = ["aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall"]
+# to the trailing edge, x/c in [0, 1.01], with the kt_km column), ./data/aairfoil_2M_full2Dfield_down0_up1.h5
+Datasets   = ["aairfoil_2M_full2Dfield_down0_up1"]
 upy        = 1.0     # Keep n1/delta <= upy (>= 1: no upper cut, i.e. the full profiles)
 downy      = 0.0     # Keep n1/delta >= downy (0: no lower cut; honoured even when upy >= 1)
 Stride     = 2       # Keep every Stride-th point of each dataset (1 = all points)
@@ -57,7 +55,7 @@ MaxSamples = 0       # > 0: deterministic evenly spaced subsample of all points 
 [data.Files]
 # Optional explicit h5 path per dataset key (absolute, or relative to the repository root, where the scripts run),
 # for files that are not in ./data/, e.g.
-# aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall = "/path/to/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5"
+# aairfoil_2M_full2Dfield_down0_up1 = "/path/to/aairfoil_2M_full2Dfield_down0_up1.h5"
 
 [eqwm]
 Law = "charles"      # EQWM (turbulent fallback and comparison): "charles" (CharLES BFMv2 two-layer law) or "parent" (upstream's log_law_solve)

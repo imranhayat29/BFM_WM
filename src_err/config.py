@@ -253,7 +253,7 @@ def test_schema(variant: str) -> Dict[str, Any]:
         },
         "data": {
             "Datasets": Key("list[str]",
-                            ["aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall"] if lamturb else
+                            ["aairfoil_2M_full2Dfield_down0_up1"] if lamturb else
                             ["gaussian_2M_APG", "gaussian_2M_FPG", "gaussian_2M_SEP", "gaussian_2M_MAPG"],
                             check=lambda v: None if v else "must not be empty"),
             "upy": Key("float", 1.0 if lamturb else 0.15, check=_positive),
@@ -314,7 +314,7 @@ def test_schema(variant: str) -> Dict[str, Any]:
         },
     }
     if lamturb:
-        schema["switch"] = {"KtKmThreshold": Key("float", 0.002)}
+        schema["switch"] = {"KtKmThreshold": Key("float", 0.005)}  # CharLES BFMv2 lam-turb inputs; notebooks 0.002
         schema["lam"] = {"models": _models_schema("lam"), "classes": _test_classes_schema()}
         schema["turb"] = {"models": _models_schema("turb"), "classes": _test_classes_schema()}
     else:

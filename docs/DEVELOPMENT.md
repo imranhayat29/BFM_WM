@@ -191,7 +191,7 @@ Cell references found in the code (all 0-based):
 ### 3.3 Notebook values that differ from the v2 TOMLs
 
 Values that are equal in both (gates 10±5 % / 0.7±0.05 / 4±2 for turbulent and 15±5 % / 0.85±0.1 / 4±2 for
-lam-turb, `kt_km_threshold` 0.002, `downsample_factor` 2, the test windows (TURB-NB n1/δ <= 0.15 with `downy` 0;
+lam-turb, `downsample_factor` 2, the test windows (TURB-NB n1/δ <= 0.15 with `downy` 0;
 LT-NB the full profiles, v2 `upy` 1.0), class lists, architectures, learning rates, batch sizes, the mean-field
 confidence with v = 1 (`cov=None`), C_f-line settings, tripcolor limits of LT-NB c78) are not repeated.
 
@@ -210,6 +210,7 @@ confidence with v = 1 (`cov=None`), C_f-line settings, tripcolor limits of LT-NB
 | EVB error-change filter | `thresh_err_change = 0.1` | `MinErrorChangePercent = 0` (off) | the filter biases the means |
 | EVB percent error | `/(\|t\| + 1e-6)`, per-array outlier cuts | low-value blend 2±1, one joint outlier mask | consistent with the test scripts |
 | EVB window | the turbulent checkpoint's `[0.0025, 0.15]` | same | — |
+| Kt/Km threshold (lam-turb) | LT-NB c3 `kt_km_threshold = 0.002` | `[switch] KtKmThreshold = 0.005` (0.002 until 2026-10-26) | the value of the CharLES BFMv2 lam-turb inputs (owner's choice) |
 
 ### 3.4 Class lists: notebook indices and v2 names
 
@@ -330,8 +331,8 @@ IDs refer to the decision log's bug list.
 
 ## 5. Data provenance
 
-`data/` holds **training data only** (git-lfs; all 144 upstream LFS files plus the additions below, about 930 MB
-pulled from upstream). Differences from upstream:
+`data/` holds the **training data** and the **lam-turb test set** (git-lfs; all 144 upstream LFS files plus the additions
+below, about 930 MB pulled from upstream). Differences from upstream:
 
 | File | Source | Change | Why |
 |---|---|---|---|
@@ -340,6 +341,7 @@ pulled from upstream). Differences from upstream:
 | `aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_{ZPG,APG,FPG}.h5` | fork, untracked | added | additional data of the laminar SNGP (n1/δ 0.02-0.8, `kt_km` column) |
 | `aairfoil_2M_full2Dfield_down0p005_up1_laminar_{ZPG,APG,FPG}.h5` | fork, untracked (dated 2026-04-14) | added (review decision, 2026-10-25) | additional data of the laminar error model (n1/δ 0.005-1); the reference "UPY1" model's statistics match them |
 | `gaussian_2M_data_{MAPG,FPG}.h5` | **upstream** | unchanged | the fork's local copies are corrupted ([5.1](#51-corrupted-gaussian-copies-in-the-fork)) |
+| `aairfoil_2M_full2Dfield_down0_up1.h5` | fork, untracked | added 2026-10-26 (owner's choice) | lam-turb test set ([5.2](#52-lam-turb-test-set)) |
 
 - `hump_*` regions are upstream files.
 - Candidate generators of the A-airfoil region files in the fork: `split_aairfoil_2M_by_region_generateFull2D.py`,
@@ -347,7 +349,7 @@ pulled from upstream). Differences from upstream:
 - Not included (D2/D7): the reference C_f/geometry files `BFM_WM/data/Gray_x_vs_Cf.csv` (Gaussian-bump C_f),
   `WM_data_creation/airfoil_Tamaki/2M/surface_data.txt` (A-airfoil x/c, C_f; LT-NB's truth) and
   `BFM_WM/tmp/aairfoil-coords.txt` (airfoil geometry). v2 uses the dataset truth instead.
-- `wall_model_cases.py` registers 79 keys whose files are not in `data/` (`aposteriori_*`, `aairfoil_10M*`, the other
+- `wall_model_cases.py` registers 78 keys whose files are not in `data/` (`aposteriori_*`, `aairfoil_10M*`, the other
   `aairfoil_2M_full2Dfield*` and `aairfoil_2M_{laminar,transition,turbulent}`, `transition_JHU_full2Dfield*`,
   `ph_B_full2Dfield*`); their files are in `BFM_WM/data/`.
 
@@ -362,12 +364,17 @@ mean near 955 instead of about 990 (reference 993.39) and an error mean near 2.8
 
 ### 5.2 Lam-turb test set
 
-`aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5` (145 MB): full 2D-field extraction of the A-airfoil
+`aairfoil_2M_full2Dfield_down0_up1.h5` (145 MB, git-lfs since 2026-10-26): full 2D-field extraction of the A-airfoil
 at Re = 2M (wall-normal profiles from leading to trailing edge, x/c in [0, 1.01], `kt_km` column), made with the
-WM_data_creation scripts. It is untracked in the fork and not distributed; the owner's copy (location in
-`docs/dev_local/LOCAL_PATHS.md`) is linked into `data/` under its key name, which `.gitignore` excludes, and
-`test_lamturb.toml` finds it there by key (no `[data.Files]` entry). Earlier versions of the TOML pointed at it with
-`[data.Files]`, first relative to a sibling clone of the fork, then by an absolute path.
+WM_data_creation scripts. It is the fork's untracked file of the same name (md5 `299f5084…`), and the key was already
+in the registry. Its target is the raw LES u_τ.
+
+Until 2026-10-26 the test set was the fork's `aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5`
+(untracked, used through a git-ignored local link): the same 557 479 points and inputs, but with u_τ Gaussian-filtered
+along x. The two targets differ by a median of 0.28 % (95th percentile 35 %, up to a factor of 15). Lam-turb errors
+from before that date were computed with the filtered file: the numbers in [12.2](#122-a-priori-comparison) and the
+always-corrected errors in [10.1](#101-negative-raw-baseline-outputs). Statistics of the inputs are the same for both
+files (the raw < 0 counts in 10.1, the u2 < 0 fraction in [10.2](#102-input-frame)).
 
 ---
 
@@ -469,8 +476,9 @@ later blocks override earlier ones, and the "Rec." sections below them are histo
 
 **Data** — see [section 5](#5-data-provenance): D2 (git-lfs, `--local`; training data only; test set by path),
 "Data correction" (upstream's gaussian MAPG/FPG; the other 5 replacements stay), review decision (laminar error-model
-data = `down0p005_up1`; laminar SNGP keeps `up0p8`); the lam-turb test set is not distributed and is found in `data/`
-under its key name (a git-ignored local copy or link).
+data = `down0p005_up1`; laminar SNGP keeps `up0p8`); the lam-turb test set was not distributed and was found in `data/`
+under its key name (a git-ignored local copy or link) until 2026-10-26; since then `aairfoil_2M_full2Dfield_down0_up1.h5`
+(raw LES u_τ) is tracked in `data/` ([5.2](#52-lam-turb-test-set)).
 
 **Publishing and models** (2026-10-25): published as branch `v2` (default branch) of the owner's public fork; commits
 authored as `ihayat@caltech.edu`; the 7 reference models tracked with git-lfs in `models/baseline|sngp|error/`
@@ -499,7 +507,7 @@ first push so that no commit contains them; the README is cluster-neutral (venv 
 - y+ of the near-wall switch from the EQWM u_τ (turbulent) or the laminar law (laminar).
 - σ% gate metric 100σ/|π_out,b| blended with 100σ/sqrt(|π1|), ramp on |π_out,b| with threshold 2, Δ 1;
   `"ratio"` (σ/|μ|) kept as an option.
-- Laminar points: both fallbacks use the laminar law without dp/ds; Kt/Km laminar if `kt_km <= 0.002`.
+- Laminar points: both fallbacks use the laminar law without dp/ds; Kt/Km laminar if `kt_km <= 0.005` (0.002 until 2026-10-26, as in LT-NB).
 - EQWM: CharLES two-layer law by default; `Law = "parent"` reproduces `log_law_solve`; both vectorised.
 - Corrected candidate: |raw + μ| only; the notebook form is not kept as an option (measured effect in [10.1](#101-negative-raw-baseline-outputs)).
 - Input frame: no `InputFrame` option; to-do (retrain in the u2-positive frame), see [9.3](#93-remaining-difference-the-input-sign-frame).
@@ -603,7 +611,8 @@ worse on reversed flow). Notes for an implementation: keep |π1| frame-invariant
 ### 10.1 Negative raw baseline outputs
 
 The baseline is trained on |u_τ| but its linear output layer can return small negative values near the wall and
-around separation. Reference models, benchmark window and filters (turbulent) and `test_lamturb.toml` (lam-turb):
+around separation. Reference models, benchmark window and filters (turbulent) and `test_lamturb.toml` (lam-turb; Kt/Km threshold 0.002
+and the C_f-filtered test file, as of 2026-10-25):
 
 | Set | Points | raw < 0 | Most negative raw (π_out) |
 |---|---|---|---|
@@ -771,7 +780,6 @@ sys.exit(1 if bad else 0)
 ### 11.5 Open items
 
 - Input sign frame ([9.3](#93-remaining-difference-the-input-sign-frame)).
-- The lam-turb test set is not distributed (only the owner has a copy); the reference models are in git-lfs.
 - Output naming: "corrected" in test outputs means the blended prediction (kept from the notebooks); a rename to
   "blended" would need the alias kept for old TOMLs.
 - The CharLES copies of the exported data files still need the `#define` suffix edits by hand.
@@ -812,7 +820,7 @@ models (GPU, 20 min). The scratch files are in the owner's working copy, `result
 | | v2 `lamturb_turb` (4000) + `error_turb_v2` | 6.84 | 2.41 | 3.94 | 0.996 | 71.1 % |
 | | reference ep5000 + ep3811 | 6.84 | 2.24 | 3.42 | 0.977 | 76.0 % |
 | | v2 `turb` (5000) + `error_turb_v2` | 6.84 | 2.35 | 3.94 | 0.998 | 71.1 % |
-| `test_lamturb` (A-airfoil 2M, 278 740 points) | reference | 43.14 (6.00) | 43.51 (4.56) | 31.16 (5.00) | 0.790 | 45.1 % |
+| `test_lamturb` (A-airfoil 2M, C_f-filtered test file, Kt/Km threshold 0.002, 278 740 points) | reference | 43.14 (6.00) | 43.51 (4.56) | 31.16 (5.00) | 0.790 | 45.1 % |
 | | v2 | 43.14 (6.00) | 42.95 (5.05) | 38.44 (5.01) | 0.814 | 55.2 % |
 
 | Benchmark (77 cases, 1.48 M points) | Baseline | Blended | Always-corrected | C mean |

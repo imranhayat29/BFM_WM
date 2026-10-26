@@ -11,7 +11,7 @@ from typing import Sequence, Tuple
 
 import numpy as np
 
-DEFAULT_KTKM_THRESHOLD = 0.002
+DEFAULT_KTKM_THRESHOLD = 0.005  # CharLES BFMv2 lam-turb inputs; LT-NB used 0.002
 
 
 def laminar_mask(kt_km: np.ndarray, threshold: float = DEFAULT_KTKM_THRESHOLD) -> np.ndarray:

@@ -30,7 +30,7 @@ Two variants are kept separate:
 | **Laminar-turbulent** | a laminar and a turbulent branch, hard-switched by the $k_t/k_m$ sensor | `train_lamturb.py` | `test_lamturb.py` |
 
 $k_t/k_m$ is the ratio of the fluctuating to the mean kinetic energy. A point is laminar if
-$k_t/k_m \le$ 0.002 (`[switch] KtKmThreshold`). Both branches are evaluated on every point and the results are
+$k_t/k_m \le$ 0.005 (`[switch] KtKmThreshold`). Both branches are evaluated on every point and the results are
 switched per point. The value is read from the dataset's `kt_km` column; datasets without one are classified
 by flow name (names containing `laminar` or starting with `fs_` are laminar, all others turbulent).
 
@@ -99,7 +99,7 @@ docs/DEVELOPMENT.md      developer notes (see Development notes)
   ```bash
   git clone -b v2 https://github.com/imranhayat29/BFM_WM.git BFM_WM_v2
   cd BFM_WM_v2
-  git lfs install --local && git lfs pull     # about 1.1 GB to download, about 2.2 GB on disk
+  git lfs install --local && git lfs pull     # about 1.3 GB to download, about 2.6 GB on disk
   ```
 - Run all scripts from the repository root. Paths are relative to it: `./inputfiles`, `./models`, `./data`,
   `./results`.
@@ -111,7 +111,8 @@ docs/DEVELOPMENT.md      developer notes (see Development notes)
 
 Data are stored in `data/` directories. They cover data summarized in [Table](https://docs.google.com/spreadsheets/d/18hcHtwxN7-uUAkYSo2UL1Tny2SpPDvQiWsKEqjHOlh0/edit?usp=sharing) and the data generation repository [Repo](https://github.com/yuenongling/WM_data_creation?tab=readme-ov-file).
 
-`data/` holds the **training data** of all reference models. Differences from upstream's data:
+`data/` holds the **training data** of all reference models and the **lam-turb test set**. Differences from
+upstream's data:
 
 | File | Change | Why |
 |---|---|---|
@@ -119,14 +120,10 @@ Data are stored in `data/` directories. They cover data summarized in [Table](ht
 | `curved_TBL_APG_data.h5`, `curved_TBL_FPG_data.h5` | replaced (same numbers, case names `curved_BL_APG`/`curved_BL_FPG` instead of `curved_BL`) | the SNGP needs the two classes to be distinct |
 | `aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_{ZPG,APG,FPG}.h5` | added | additional training data of the laminar SNGP (n1/δ 0.02-0.8, with a `kt_km` column) |
 | `aairfoil_2M_full2Dfield_down0p005_up1_laminar_{ZPG,APG,FPG}.h5` | added | additional training data of the laminar error model (n1/δ 0.005-1, with a `kt_km` column) |
+| `aairfoil_2M_full2Dfield_down0_up1.h5` | added | test set of `test_lamturb.py`: full 2D-field extraction of the A-airfoil at Re = 2M (wall-normal profiles from the leading to the trailing edge, with a `kt_km` column) |
 
 - **Dataset lookup.** The TOMLs name datasets by key. A key is resolved to a file in this order: an explicit
   path in the TOML's `[data.Files]` table, `./data/<key>_data.h5`, then the entry in `wall_model_cases.py`.
-- **Lam-turb test set.** `aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5`, the default test
-  set of `test_lamturb.py`, is **not included** in this repository (contact the repository owner to obtain it). It is
-  a full 2D-field extraction of the A-airfoil at Re = 2M, with the `kt_km` column. Place the file, or a link to
-  it, in `data/` under exactly that name (it is git-ignored there), or give its path in the `[data.Files]` table
-  of the test TOML.
 - `wall_model_cases.py` also registers keys whose files are not included (the comment at the top of the file
   lists them). Place such files in `data/` or give their paths in `[data.Files]` to use them.
 
@@ -360,7 +357,7 @@ $\pi_{out} = u_\tau n_1/\nu$, which is the $y^+$ of that $u_\tau$. $y$ denotes t
    - **Turbulent points:** the EQWM. By default (`[eqwm] Law = "charles"`) this is the CharLES BFMv2
      two-layer law: $u^+ = y^+$ for $y^+ \le 11.0623$, else $u^+ = \ln(y^+)/0.41 + 5.2$, solved from
      $|\pi_1| = u^+ y^+$. Here $y^+_{nw} = \pi_{out,EQWM}$.
-   - **Laminar points** (lam-turb, $k_t/k_m \le$ `KtKmThreshold` = 0.002): the laminar law
+   - **Laminar points** (lam-turb, $k_t/k_m \le$ `KtKmThreshold` = 0.005): the laminar law
      $\tau_w = \mu|u_1|/y_1$ (no pressure-gradient term), i.e. $\pi_{out} = \sqrt{|\pi_1|}$, with its own
      $y^+_{nw} = \sqrt{|\pi_1|}$. Laminar points thus go through the same three switches as turbulent points,
      with the laminar branch's networks and the laminar law in place of the EQWM, as in CharLES BFMv2.
@@ -424,7 +421,7 @@ turbulent-only / lam-turb.
 | `[confidence]` | `Covariance`: `"none"` (default, $v = 1$ as in CharLES) or `"gp"` (per-point GP variance) |
 | `[gates]` | `Aleatoric` (`Type = "percentage"`, threshold `10` / `15` ± `5`; `Type = "ratio"` defaults to `1.0` ± `0.5`), `Confidence` (`0.7` ± `0.05` / `0.85` ± `0.1`), `Yplus` (`4` ± `2`), `LowValue` (`2` ± `1`) |
 | `[metrics]` | `LowValue` (`2` ± `1`): low-value blend of the evaluation percent errors |
-| `[switch]` (lam-turb) | `KtKmThreshold` (`0.002`): a point is laminar if `kt_km` ≤ threshold |
+| `[switch]` (lam-turb) | `KtKmThreshold` (`0.005`): a point is laminar if `kt_km` ≤ threshold |
 | `[plots]` | `SpatialMaps` (`false`), `CfLines`, `Pdfs`, `Tripcolor` (`true`), and per-figure tables `[plots.maps]`, `[plots.cf_lines]`, `[plots.pdfs]`, `[plots.tripcolor]` (axes, colour ranges, station selection; `ShowSelected` (`false`) in the map tables marks the $|C_f|$ line-plot stations) |
 
 The gate entries are inline tables, e.g. `Confidence = { Threshold = 0.7, Delta = 0.05 }`.
@@ -501,7 +498,7 @@ installation is needed for them. The scripts of this repository do not need LaTe
 | `plot_utils.py`, `src/plot_utils.py`, `src/visualization.py` | No longer load a personal matplotlib style file. |
 | `test_model.py`, `test_model_summary_table.py`, `src/wall_model.py` | Create their output folders when needed. The summary table keeps dots in the checkpoint name and accepts a model subfolder (e.g. `baseline/<checkpoint>.pth`). |
 | `requirements.txt` | New: the pinned Python 3.11 environment. |
-| `.gitignore` | `inputfiles/` and the reference models in `models/` are tracked; models trained locally, `docs/dev_local/` (local developer files), a local copy of the lam-turb test set and the output folders of the upstream testing tools are ignored. |
+| `.gitignore` | `inputfiles/` and the reference models in `models/` are tracked; models trained locally, `docs/dev_local/` (local developer files) and the output folders of the upstream testing tools are ignored. |
 | `models/` | Reference models tracked with git-lfs (`models/.gitattributes`), in `baseline/`, `sngp/` and `error/`; upstream keeps `models/` out of git. |
 | `data/` | See [Data](#data). |
 | `README.md` | `test_model.py` takes `--model_path` (the old usage line was out of date). |

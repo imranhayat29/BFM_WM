@@ -15,9 +15,9 @@ DATASET_PLOT_TITLE[f'Case_name'] = f'Title for the case'
 # NOTE: BFM_WM_v2: this registry also contains every case added in the BFM_WM error-model/SNGP fork
 # (A-airfoil 2M/10M full-2D-field sets and their region splits, transition_JHU and ph_B full-2D fields,
 # NASA hump pressure-gradient regions hump_*, and the a-posteriori LES sets aposteriori_*).
-# Only the data needed for training are shipped in ./data: the hump_* regions and the laminar
-# A-airfoil sets aairfoil_2M_full2Dfield_{down0p02_up0p8,down0p005_up1}_laminar_{ZPG,APG,FPG}
-# (the down0p005_up1 keys are added by BFM_WM_v2). The other added keys
+# Shipped in ./data: the training data (the hump_* regions and the laminar A-airfoil sets
+# aairfoil_2M_full2Dfield_{down0p02_up0p8,down0p005_up1}_laminar_{ZPG,APG,FPG}; the down0p005_up1 keys are
+# added by BFM_WM_v2) and the lam-turb test set aairfoil_2M_full2Dfield_down0_up1. The other added keys
 # (aposteriori_*, aairfoil_10M*, the remaining aairfoil_2M_full2Dfield* and aairfoil_2M_{laminar,
 # transition,turbulent}, transition_JHU_full2Dfield*, ph_B_full2Dfield*) point to files that are not
 # in this repository; place the files in ./data (or pass explicit paths in the test TOMLs) to use them.

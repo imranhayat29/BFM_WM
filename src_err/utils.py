@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional
 import numpy as np
 
 # torch is imported only where it is needed (set_seeds, configure_devices), so that the config,
-# JSON and path helpers stay importable without it (e.g. `tools/apriori_benchmark.py --replot`)
+# JSON and path helpers stay importable without it (e.g. `test_turb_allcases.py --replot`)
 if TYPE_CHECKING:
     import torch
 

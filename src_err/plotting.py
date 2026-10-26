@@ -12,7 +12,7 @@ Figure families (``<prefix>_`` is prepended when ``prefix`` is non-empty):
 - ``cf_lines`` / ``cf_lines_ma``: |C_f| at the selected stations, raw and moving-averaged;
 - ``pdf_errors`` / ``pdf_confidence``: error and confidence PDFs;
 - ``confusion_matrix``, ``sngp_history``, ``error_history``: training diagnostics;
-- ``<RunName>_<fig>[_log]``: a-priori benchmark figures (see tools/README.md).
+- ``<RunName>_<fig>[_log]``: figures of the all-cases test (test_turb_allcases.py; see the README).
 
 Conventions:
 
@@ -959,7 +959,7 @@ def plot_error_history(history: Mapping[str, Sequence[float]], best_epoch: Optio
 
 
 # ---------------------------------------------------------------------------
-# A-priori benchmark (tools/apriori_benchmark.py; EVB / LOG / AIAA notebooks)
+# All-cases test (test_turb_allcases.py; EVB / LOG / AIAA notebooks)
 # ---------------------------------------------------------------------------
 
 # EVB CASE_MARKER_MAP (lower-case case keys), verbatim.

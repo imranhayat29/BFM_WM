@@ -24,7 +24,7 @@ from parsing_wm import parse_toml_config
 from src_err.utils import resolve_input_file, to_jsonable
 
 # This module must stay free of torch/TensorFlow imports (src_err.utils is), so that
-# `tools/apriori_benchmark.py --replot` can validate a TOML without loading either.
+# `test_turb_allcases.py --replot` can validate a TOML without loading either.
 
 # ---------------------------------------------------------------------------------------
 # Schema building blocks
@@ -200,7 +200,7 @@ def error_schema() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------------------
-# Test and benchmark schemas (test/*.toml, benchmark/apriori_benchmark.toml)
+# Test schemas (test/test_turb.toml, test/test_lamturb.toml) and the all-cases test schema (test/test_turb_allcases.toml)
 # ---------------------------------------------------------------------------------------
 
 
@@ -325,11 +325,11 @@ BENCHMARK_FIGURES = ["train_test", "train_test_zoom", "sigma", "confidence", "pd
 
 
 def benchmark_schema() -> Dict[str, Any]:
-    """Schema of benchmark/apriori_benchmark.toml (see tools/README.md)."""
+    """Schema of test/test_turb_allcases.toml (test_turb_allcases.py; see the README)."""
     return {
         "general": {
-            "RunName": Key("str", "apriori_benchmark"),
-            "OutputDir": Key("str", "results/apriori_benchmark"),
+            "RunName": Key("str", "test_turb_allcases"),
+            "OutputDir": Key("str", "results/test_turb_allcases"),
             "Formats": Key("list[str]", ["pdf", "png"], enum=FIGURE_FORMATS),
             "GpuNum": Key("int", 0),
         },
@@ -587,7 +587,7 @@ BRANCHES = ("lam", "turb")
 
 # (article, name) of each TOML kind in messages
 _KIND_LABELS = {"sngp": ("an", "SNGP"), "error": ("an", "error-model"), "test": ("a", "test"),
-                "benchmark": ("an", "a-priori benchmark"), "baseline": ("a", "baseline wall-model")}
+                "benchmark": ("an", "all-cases test"), "baseline": ("a", "baseline wall-model")}
 
 
 def is_lamturb(cfg: Dict[str, Any]) -> bool:
@@ -680,7 +680,7 @@ def _usage_text(kind: str, lamturb: Optional[bool], same_script: bool) -> str:
             return "use test_turb.py or test_lamturb.py"
         return "use test_lamturb.py" if lamturb else "use test_turb.py"
     if kind == "benchmark":
-        return "use tools/apriori_benchmark.py"
+        return "use test_turb_allcases.py"
     return "train the baseline with train_wm_proposal.py"
 
 
@@ -892,15 +892,15 @@ def load_test_config(arg: str, variant: str) -> Dict[str, Any]:
 
 def load_benchmark_config(arg: str) -> Dict[str, Any]:
     """
-    Load and validate the a-priori benchmark TOML (tools/apriori_benchmark.py)
+    Load and validate the all-cases test TOML (test_turb_allcases.py)
 
     Args:
-        arg: TOML name under ./inputfiles/ (or ./inputfiles/benchmark/), or a path
+        arg: TOML name under ./inputfiles/ (or ./inputfiles/test/), or a path
 
     Returns:
         Validated config with defaults filled in
     """
-    raw = _load_raw(arg, "benchmark")
+    raw = _load_raw(arg, "test")
     config_file = raw.get("config_file", arg)
     check_kind(raw, config_file, "benchmark")
     _apply_aleatoric_type_defaults(raw.get("gates"))

@@ -18,7 +18,7 @@ This repository is a fork of [yuenongling/BFM_WM](https://github.com/yuenongling
 `upstream`). The baseline wall model, its data handling and its training/testing scripts are upstream's
 (with the changes listed in [Changes relative to upstream](#changes-relative-to-upstream)). This repository
 adds the error model, the SNGP confidence model, the blended prediction, their training and test scripts
-with TOML configs, a multi-dataset a-priori benchmark, and exporters to the CharLES BFMv2 solver (the
+with TOML configs, an a-priori test on all cases, and exporters to the CharLES BFMv2 solver (the
 group's GPU LES code that runs this wall model a posteriori). The formulas match those of CharLES BFMv2. One
 difference remains, the sign frame of the network inputs on reversed-flow points (see [To do](#to-do)).
 
@@ -43,16 +43,16 @@ train_turb.py            SNGP and/or error-model training, turbulent-only
 train_lamturb.py         SNGP and/or error-model training, laminar + turbulent branches
 test_turb.py             a-priori test of the blended prediction, turbulent-only
 test_lamturb.py          a-priori test of the blended prediction, laminar-turbulent
+test_turb_allcases.py    a-priori test of the turbulent blended prediction on all cases (80 dataset keys)
 inputfiles/
   input2_example.toml    commented example baseline config in upstream's format (see Workflow, step 1)
   baseline/              baseline configs of the reference checkpoints (baseline_turb, baseline_lam)
   sngp/                  SNGP training configs (sngp_turb, sngp_lamturb)
   error/                 error-model training configs (error_turb, error_lamturb)
-  test/                  test configs (test_turb, test_lamturb)
-  benchmark/             multi-dataset a-priori benchmark config
+  test/                  test configs (test_turb, test_lamturb, test_turb_allcases)
 src/                     baseline package (upstream, see src/README.md)
 src_err/                 error model, SNGP, blended correction, data, metrics, plots
-tools/                   CharLES export scripts and the a-priori benchmark (see tools/README.md)
+tools/                   CharLES export scripts (see tools/README.md)
 wall_model_cases.py      dataset registry (upstream + additional keys)
 data/                    HDF5 datasets (git-lfs)
 models/                  trained models (git-ignored, see Reference models)
@@ -63,14 +63,14 @@ docs/DEVELOPMENT.md      developer notes (see Development notes)
 
 | Module | Content |
 |---|---|
-| `config.py` | Reads and validates the SNGP, error-model, test and benchmark TOMLs (unknown keys are errors) |
+| `config.py` | Reads and validates the SNGP, error-model and test TOMLs (unknown keys are errors) |
 | `data.py` | Baseline checkpoint and train/valid split, dataset loading with the n1/δ window, additional-data split, $k_t/k_m$ |
 | `classes.py` | SNGP class bookkeeping by name: remove, merge, post-hoc groups, display names |
 | `sngp.py` | SNGP model, training, saving/loading (with metadata), batched prediction, confidence |
 | `error_model.py` | Error model build/training/saving/loading/prediction, normalisation statistics |
 | `gating.py` | EQWM and laminar law, aleatoric metric, ramps, the 3-switch blend |
 | `lamturb.py` | $k_t/k_m$ switch and composite class labels |
-| `pipeline.py` | The shared inference pipeline of the test scripts and the benchmark |
+| `pipeline.py` | The shared inference pipeline of the three test scripts |
 | `evaluation.py` | Percent errors and summary statistics |
 | `training.py` | Orchestration of the training scripts |
 | `reporting.py`, `plotting.py`, `selection.py` | Figures, `summary.json`, station selection for line plots |
@@ -204,18 +204,97 @@ candidate $y_{corr}$ everywhere (see [The blended prediction](#the-blended-predi
 The test truth is the dataset target. **No prediction uses any true-target information**: gates, fallbacks and
 y+ use only quantities available at inference time, as in CharLES. All comparisons are on magnitudes.
 
-### 4. Multi-dataset a-priori benchmark
+### 4. A-priori test on all cases
+
+`test_turb_allcases.py` evaluates the turbulent wall model a priori (on stored datasets of wall-normal profiles,
+without running a flow solver) on all cases at once, 80 dataset keys by default, and compares, per case, the mean
+error of the baseline with the mean error of the blended model. Every dataset goes through the pipeline of
+`test_turb.py` (`src_err/pipeline.predict_turb`): baseline, error model, SNGP confidence, EQWM fallback, and the blend
+of three switches that use inference-time information only. Laminar and transitional datasets also take this
+turbulent path (there is no $k_t/k_m$ switch here). The models are loaded once; one pass per dataset gives the
+blended, the always-corrected ($y_{corr}$ everywhere) and the EQWM predictions.
+
+The configuration is `inputfiles/test/test_turb_allcases.toml`. It is self-contained (its own model paths and gate
+thresholds, with the same defaults as `test/test_turb.toml`), and every key is commented there.
 
 ```bash
-python tools/apriori_benchmark.py benchmark/apriori_benchmark.toml [--gpu N] [--datasets k1 k2 ...] [--scale linear|log|both]
-python tools/apriori_benchmark.py benchmark/apriori_benchmark.toml --dry-run      # validate the TOML and the dataset files only
-python tools/apriori_benchmark.py --replot results/apriori_benchmark --scale log   # redraw without TF/torch
+python test_turb_allcases.py test/test_turb_allcases.toml --gpu 0        # all 80 dataset keys
+python test_turb_allcases.py test/test_turb_allcases.toml --dry-run      # only check the TOML and every dataset/model file
+python test_turb_allcases.py test/test_turb_allcases.toml --gpu -1 \
+    --datasets CH TBL_5 "Gaussian bump 2M" --max-samples 3000 --output-dir results/smoke/test_turb_allcases
+python test_turb_allcases.py --replot results/smoke/test_turb_allcases --scale log   # figures only, no torch/TF
 ```
 
-The turbulent-only pipeline of `test_turb.py` is run on many datasets. Per-dataset (and per-group) error
-statistics of the baseline, blended, always-corrected and EQWM predictions go to `cases.csv`, `overall.json`
-and `points.npz`. Figures: baseline-vs-corrected scatter (linear, zoom, log-log), σ- and confidence-coloured
-scatters, and PDFs. Details are in [tools/README.md](tools/README.md).
+| Option | Meaning |
+| --- | --- |
+| `<toml>` | TOML under `./inputfiles/` or a path; optional with `--replot` |
+| `--gpu N` | GPU index, -1 = CPU; overrides `[general].GpuNum` |
+| `--output-dir DIR` | output directory; overrides `[general].OutputDir` (with `--replot`: where the figures go, default `RUN_DIR`) |
+| `--max-samples N` | per-dataset deterministic sample cap, applied after the domain filter (0 = all); overrides `[data].MaxSamplesPerDataset` |
+| `--datasets k1 k2 ...` | evaluate only these keys; a `[groups]` name expands to its members, and a group is pooled from the members selected |
+| `--scale linear\|log\|both` | scatter axes; overrides `[plots].Scale` |
+| `--replot RUN_DIR` | regenerate every figure from `RUN_DIR/cases.csv` + `points.npz`, without torch, TensorFlow or inference; plot options from the given TOML, else from `RUN_DIR/overall.json` |
+| `--dry-run` | validate the TOML and resolve every dataset and model file, then exit (no models loaded) |
+
+**Processing of each dataset**
+
+1. **Load** with the `[data]` wall-distance window (default n1/δ in `[0.0025, 0.15]`, the training window of the
+   turbulent baseline) and `Stride`.
+2. **Domain filter** `[evaluation].DomainFilter`: `"retau"` keeps points with $|u_\tau\delta/\nu|$ > `RetauMin` (5),
+   `"piout"` keeps $|\pi_{out,true}| \ge$ `PioutMin` (2), `"none"` keeps all; a zero minimum disables the filter.
+3. **Sample cap** `MaxSamplesPerDataset` (deterministic, evenly spaced).
+4. **Prediction** with the pipeline.
+5. **Percent errors** with the low-value blend on the truth (`[metrics].LowValue`, 2 ± 1), as in the other test
+   scripts, so that near-zero targets do not blow up the errors.
+6. **Outlier mask** (joint): a point is dropped if any of the baseline, blended or EQWM |e%| exceeds
+   `OutlierPercent` (10000), so all predictions of a case are compared on the same points.
+7. **Error-change filter** (optional, off by default): `MinErrorChangePercent > 0` keeps only points where the
+   blended error differs from the baseline error by more than that value. It biases the statistics towards points
+   the correction changes.
+
+The dataset truth (the target and the dataset $u_\tau$) only selects evaluation points and gives the percent errors;
+it never enters a prediction. Missing dataset files and models are reported before the models are loaded; a dataset
+that fails later (unreadable, or no points left after a filter) is recorded as skipped with its reason. Only the
+datasets listed in `[data].Datasets` are evaluated.
+
+**Cases, roles and statistics**
+
+- **Cases.** Every dataset that is not in a group is one case. Every `[groups]` entry is one case whose members'
+  points are pooled; members are not plotted individually. The default group `"Gaussian bump 2M"` pools the four
+  `gaussian_2M_*` subsets (APG, FPG, SEP, MAPG) the baseline was trained on.
+- **Roles.** A case is `training` (blue) if it is listed in `[data].TrainingDatasets`, otherwise `untrained`
+  (maroon); a group is `training` if its name or any member is listed. The default list holds the training sets of
+  the turbulent baseline plus the additional training sets of the error model and the SNGP. The JHU transitional
+  boundary layer appears twice: `Transition_transition` (its transition region, which the error model and the SNGP
+  were trained on, role `training`) and the full `Transition` case (role `untrained`).
+- **Per case:** mean, median and P90 of |e%| for the baseline, the blended (final), the always-corrected and the
+  EQWM predictions; improvement = mean baseline |e%| − mean final |e%|, and the maximum point-wise improvement; mean
+  σ% and mean confidence $C$; the mean switch weights $\alpha_a$, $\alpha_c$, $\alpha_{nw}$; the fractions of points
+  fully corrected (all three weights 1) and in full EQWM fallback; point counts after the window (`n_raw`), the
+  domain filter (`n_domain`), the cap (`n_eval`) and the outlier and error-change filters (`n_used`).
+- **Overall:** the unweighted mean over cases (each case counts once; the headline number), the point-weighted mean
+  over all used points, and both per role.
+
+**Outputs**, written to `[general].OutputDir` (default `results/test_turb_allcases`):
+
+| File | Content |
+| --- | --- |
+| `cases.csv` | one row per dataset, group member, group and skipped dataset (column `kind`), with the statistics above and the fraction of points whose stored network input is inconsistent with $u_1 n_1/\nu$ (a data check) |
+| `overall.json` | resolved configuration, command line, model paths, git commit, package versions, overall averages, skipped datasets, timings |
+| `points.npz` | float32 per-point errors, σ%, $C$, switch weights and $\pi_{out}$ values; `dataset`/`case` indices into `dataset_keys`/`case_names`; the `training` and `used` masks |
+| console | a summary table of the mean \|e%\| per case with the overall averages, and a table of the points removed by the domain filter per dataset |
+
+Figures are named `<RunName>_<figure>[_log].<fmt>` (default `RunName` = `test_turb_allcases`; `[plots].Figures`
+selects them, `Formats` sets the formats):
+
+| Figure | Content |
+| --- | --- |
+| `train_test` | one marker per case at (mean baseline \|e%\|, mean final \|e%\|), coloured by role, with the y = x line ("Same Performance"), the legend and, on linear axes, the dash-dot zoom box. With `Scale = "log"` or `"both"` also `train_test_log` on log-log axes: cases with non-positive or non-finite errors are skipped with a warning, and a limit <= 0 is set automatically from the data |
+| `train_test_zoom` | the same scatter within `ZoomLimits` (linear only) |
+| `sigma` | the scatter coloured by the mean σ% of each case (jet colour map, `SigmaColorRange`) |
+| `confidence` | the scatter coloured by the mean confidence $C$ of each case (`ConfidenceColorRange`) |
+| `pdf`, `pdf_confidence` | PDFs of \|e%\| and of $C$, pooled over the used points; curves from `PdfCurves`, points from `PdfSubset`; kernel density estimates are fitted inside the plotted range, so the densities are conditional on that range |
+| `pdf_always_vs_blended` | \|e%\| PDFs of the baseline, the always-corrected and the blended predictions (needs `CompareAlways = true`) |
 
 ### 5. Export to CharLES BFMv2
 
@@ -230,7 +309,7 @@ fails at the first import (`ModuleNotFoundError: No module named 'numpy'`).
 
 On the cluster, `/usr/bin/python3.11` exists on the login nodes only (the GPU nodes have `/usr/bin/python3.9`), so a
 venv built on it works only there. The shared torch-venv is built on the cluster Python 3.11.6, which every node has;
-activating it in a job works (checked on a P100 node), and the training, test and benchmark scripts ran on P100 nodes
+activating it in a job works (checked on a P100 node), and the training and test scripts ran on P100 nodes
 with this interpreter and these packages. Example job script, submitted from the repository root with `sbatch job.sh`:
 ```bash
 #!/bin/bash
@@ -299,7 +378,7 @@ to the wrong script or option is reported as such.
 | `error/error_lamturb.toml` | `train_lamturb.py --error` | laminar and turbulent error models |
 | `test/test_turb.toml` | `test_turb.py` | models, test datasets, switches, plots |
 | `test/test_lamturb.toml` | `test_lamturb.py` | as `test_turb.toml`, per branch, plus the $k_t/k_m$ switch |
-| `benchmark/apriori_benchmark.toml` | `tools/apriori_benchmark.py` | models, datasets and groups, switches, filters, figures (see `tools/README.md`) |
+| `test/test_turb_allcases.toml` | `test_turb_allcases.py` | models, datasets and groups, switches, filters, figures (see [Workflow, step 4](#4-a-priori-test-on-all-cases)) |
 
 ### Training TOMLs (`sngp/`, `error/`)
 
@@ -354,12 +433,12 @@ mkdir -p models && cp -r <models location>/. models/
 
 | Model | Role | Used by default in | In CharLES BFMv2 |
 |---|---|---|---|
-| `cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth` | turbulent baseline (both variants) | all training TOMLs (turbulent), both test TOMLs, benchmark | yes |
+| `cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth` | turbulent baseline (both variants) | all training TOMLs (turbulent), all three test TOMLs | yes |
 | `NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth` | laminar baseline | lam-turb training TOMLs (`[lam]`), `test_lamturb.toml` | yes |
-| `sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged` | turbulent SNGP (4000 epochs) | both test TOMLs, benchmark | yes |
+| `sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged` | turbulent SNGP (4000 epochs) | all three test TOMLs | yes |
 | `sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged` | alternative turbulent SNGP (5000 epochs) | none | no |
 | `sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged` | laminar SNGP | `test_lamturb.toml` | yes |
-| `error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811` | turbulent error model (both variants) | both test TOMLs, benchmark | yes |
+| `error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811` | turbulent error model (both variants) | all three test TOMLs | yes |
 | `error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000` | laminar error model | `test_lamturb.toml` | yes |
 
 - The training TOMLs are the recipes of these models: `sngp_turb.toml` (5000 epochs) of the ep5000 SNGP,

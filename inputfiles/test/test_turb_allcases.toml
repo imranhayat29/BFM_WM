@@ -1,19 +1,19 @@
-# Multi-dataset a-priori benchmark of the turbulent BFM wall model (baseline + error model + SNGP confidence
-# + EQWM fallback, EQWM = equilibrium wall model). Documentation: tools/README.md.
+# A-priori test of the turbulent BFM wall model on all cases (baseline + error model + SNGP confidence
+# + EQWM fallback, EQWM = equilibrium wall model). Documentation: README.md, "A-priori test on all cases".
 # Every dataset goes through the turbulent pipeline of test_turb.py (src_err/pipeline.predict_turb), including the
 # laminar/transitional ones (no Kt/Km switch here). One marker per case in the scatter figures: mean |e%| of the
 # baseline vs mean |e%| of the blended (expert) model.
 # Run from the repository root:
-#   python tools/apriori_benchmark.py benchmark/apriori_benchmark.toml [--gpu N] [--output-dir DIR]
-#          [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both]
-#   python tools/apriori_benchmark.py [benchmark/apriori_benchmark.toml] --replot RUN_DIR [--scale log]
+#   python test_turb_allcases.py test/test_turb_allcases.toml [--gpu N] [--output-dir DIR]
+#          [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both] [--dry-run]
+#   python test_turb_allcases.py [test/test_turb_allcases.toml] --replot RUN_DIR [--scale log]
 # This file is self-contained (no inheritance from test_turb.toml): model paths and gate thresholds are repeated
 # here with the same defaults. Only [data].Datasets is required; every other value shown is the default, except
 # [data].TrainingDatasets, [groups] and [display_names] (default: empty).
 
 [general]
-RunName   = "apriori_benchmark"              # File-name stem of the figures: <RunName>_<figure>[_log].<fmt>
-OutputDir = "results/apriori_benchmark"      # Output directory (cases.csv, overall.json, points.npz, figures); --output-dir overrides
+RunName   = "test_turb_allcases"             # File-name stem of the figures: <RunName>_<figure>[_log].<fmt>
+OutputDir = "results/test_turb_allcases"     # Output directory (cases.csv, overall.json, points.npz, figures); --output-dir overrides
 Formats   = ["pdf", "png"]                   # Figure formats (png, pdf, svg, jpg, eps)
 GpuNum    = 0                                # GPU index for torch and TensorFlow (-1 = CPU); --gpu overrides
 
@@ -146,7 +146,7 @@ Legend       = true              # Training / Untrained / Same Performance legen
 SigmaColorRange      = [0.0, 30.0]   # Colour range of the sigma%-coloured scatter (mean sigma% per case)
 ConfidenceColorRange = [0.8, 1.0]    # Colour range of the confidence-coloured scatter (mean C per case)
 # Figures: train_test (+ _log), train_test_zoom (linear only), sigma, confidence,
-# pdf (error PDF + confidence PDF), pdf_always_vs_blended (needs CompareAlways); see tools/README.md
+# pdf (error PDF + confidence PDF), pdf_always_vs_blended (needs CompareAlways); see the README
 Figures = ["train_test", "train_test_zoom", "sigma", "confidence", "pdf", "pdf_always_vs_blended"]
 PdfMethod     = "kde"            # "kde", "histogram" ("hist") or "both"
 PdfErrorRange = [0.0, 40.0]      # |e%| range; KDEs are fitted inside it (densities conditional on |e%| in the range)

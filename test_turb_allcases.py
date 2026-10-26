@@ -1,9 +1,9 @@
 """
-Multi-dataset a-priori benchmark of the turbulent BFM wall model (baseline + error model + SNGP + EQWM)
+A-priori test of the turbulent BFM wall model (baseline + error model + SNGP + EQWM) on all cases
 
-    python tools/apriori_benchmark.py benchmark/apriori_benchmark.toml [--gpu N] [--output-dir DIR]
+    python test_turb_allcases.py test/test_turb_allcases.toml [--gpu N] [--output-dir DIR]
            [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both] [--dry-run]
-    python tools/apriori_benchmark.py [<toml>] --replot RUN_DIR [--scale linear|log|both] [--output-dir DIR]
+    python test_turb_allcases.py [<toml>] --replot RUN_DIR [--scale linear|log|both] [--output-dir DIR]
 
 Port of the Error_vs_baseline_plotting notebooks (EVB, its log-log variant and the AIAA
 always-vs-blended PDF) onto the shared v2 pipeline (src_err/pipeline.predict_turb, the same
@@ -31,11 +31,9 @@ import time
 import traceback
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-import numpy as np  # noqa: E402
+import numpy as np
 
 # Per-point fields kept for points.npz and the pooled PDFs (float32): pipeline key -> stored name
 POINT_FIELDS = {
@@ -59,7 +57,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("config", nargs="?", default=None,
-                        help="benchmark TOML under ./inputfiles/ (e.g. benchmark/apriori_benchmark.toml) or a path; "
+                        help="TOML under ./inputfiles/ (e.g. test/test_turb_allcases.toml) or a path; "
                              "optional with --replot (then the options stored in RUN_DIR/overall.json are used)")
     parser.add_argument("--gpu", type=int, default=None, help="GPU index (-1 = CPU); overrides [general].GpuNum")
     parser.add_argument("--output-dir", default=None,

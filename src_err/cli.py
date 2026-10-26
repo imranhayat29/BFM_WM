@@ -4,7 +4,7 @@ Command-line helpers shared by the training and test scripts
 train_turb.py and train_lamturb.py share the argument parser, the TOML loading and pairing
 checks, the GPU selection and the config summary printed before training; test_turb.py and
 test_lamturb.py share their argument parser and the GPU selection. All four scripts (and
-tools/apriori_benchmark.py) check with `check_inputs` that every dataset and model of their
+test_turb_allcases.py) check with `check_inputs` that every dataset and model of their
 TOMLs can be found.
 
 This module imports neither torch nor TensorFlow, so the scripts can validate their TOMLs

@@ -220,7 +220,12 @@ alphabetical h5 `case_name`s of the additional datasets, renumbered after remova
 Additional-dataset classes are named by the h5 `case_name` (e.g. `hump_FPG` → `FPG`, `aairfoil_2M` → `airfoil`), as in
 the notebooks. The derived integer labels reproduce the reference metadata exactly.
 
-### 3.5 EVB/LOG/AIAA to `tools/apriori_benchmark.py`
+### 3.5 EVB/LOG/AIAA to `test_turb_allcases.py`
+
+The port was `tools/apriori_benchmark.py` with `inputfiles/benchmark/apriori_benchmark.toml` until 2026-10-25, when it
+moved to the repository root as `test_turb_allcases.py` (TOML `inputfiles/test/test_turb_allcases.toml`, outputs
+`results/test_turb_allcases/`, figure prefix `test_turb_allcases_`). In this file and in the decision log, "the
+benchmark" means this script.
 
 - Every dataset runs through `pipeline.predict_turb`, the code of `test_turb.py`, so the benchmark uses the 3-switch
   blend with the EQWM fallback instead of EVB's binary gate; laminar/transitional sets take the turbulent path.
@@ -436,7 +441,8 @@ later blocks override earlier ones, and the "Rec." sections below them are histo
 - `--smoke`: 2 epochs, capped samples, outputs under `results/smoke/`.
 
 **TOMLs**
-- D6: `inputfiles/{baseline,sngp,error,test,benchmark}/`; `baseline_turb.toml` = the turbulent checkpoint's config,
+- D6: `inputfiles/{baseline,sngp,error,test}/` (the benchmark TOML had its own `benchmark/` folder until it moved to
+  `test/` with the script rename); `baseline_turb.toml` = the turbulent checkpoint's config,
   `baseline_lam.toml` = `input2_laminar.toml` + `downy 0.005`; `input2_example.toml` stays at the top level for the
   parent's usage. Only `GpuNum`, `UseWandb` and `Seed` differ from the embedded configs.
 - S2: lam-turb TOMLs hold `[lam]` and `[turb]` tables; a shared `[general]` is inherited.
@@ -658,7 +664,7 @@ above are the part worth keeping.
 | `results/training/<ModelName>/` | confusion matrices, class counts, histories |
 | `results/smoke/{models,training}/` | `--smoke` outputs (Overwrite allowed) |
 | `results/test_turb_gaussian_2M/`, `results/test_lamturb/` | test outputs |
-| `results/apriori_benchmark/` | benchmark |
+| `results/test_turb_allcases/` | all-cases test |
 | `results/export/` | exporter outputs |
 
 `models/` and `results/` are git-ignored.
@@ -669,19 +675,19 @@ From the repository root, with the venv active and `PYTHONDONTWRITEBYTECODE=1 OM
 
 ```bash
 # CLIs
-for s in train_turb.py train_lamturb.py test_turb.py test_lamturb.py tools/apriori_benchmark.py; do python $s --help; done
+for s in train_turb.py train_lamturb.py test_turb.py test_lamturb.py test_turb_allcases.py; do python $s --help; done
 # config loading and preflight (no torch/TF)
-python tools/apriori_benchmark.py benchmark/apriori_benchmark.toml --dry-run
+python test_turb_allcases.py test/test_turb_allcases.toml --dry-run
 # training smoke tests (2 epochs, capped samples, results/smoke/)
 python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --gpu -1 --smoke
 python train_lamturb.py --sngp sngp/sngp_lamturb.toml --error error/error_lamturb.toml --gpu -1 --smoke
 # test scripts on a subsample
 python test_turb.py test/test_turb.toml --gpu -1 --max-samples 2000 --output-dir results/smoke/test_turb
 python test_lamturb.py test/test_lamturb.toml --gpu -1 --max-samples 2000 --output-dir results/smoke/test_lamturb
-# benchmark subset and a torch/TF-free replot
-python tools/apriori_benchmark.py benchmark/apriori_benchmark.toml --gpu -1 --datasets CH TBL_5 "Gaussian bump 2M" \
-    --max-samples 3000 --output-dir results/smoke/benchmark
-python tools/apriori_benchmark.py --replot results/smoke/benchmark --scale log
+# all-cases test on a subset and a torch/TF-free replot
+python test_turb_allcases.py test/test_turb_allcases.toml --gpu -1 --datasets CH TBL_5 "Gaussian bump 2M" \
+    --max-samples 3000 --output-dir results/smoke/test_turb_allcases
+python test_turb_allcases.py --replot results/smoke/test_turb_allcases --scale log
 ```
 
 Smoke-run sanity values ([10.3](#103-statistics-reproduction)): turbulent SNGP `mean_X_train` near [990, 8.3, 1262],
@@ -732,7 +738,7 @@ sys.exit(1 if bad else 0)
   free of torch/TF imports.
 - Notebook pointers belong in code comments and this file, never in the user docs (README files, TOML comments).
 - Every TOML key has a schema entry in `src_err/config.py` and a comment in the shipped TOML; values shown in the test
-  and benchmark TOMLs equal the schema defaults except where the header says otherwise.
+  TOMLs (including `test_turb_allcases.toml`) equal the schema defaults except where the header says otherwise.
 - Docstrings: summary line, then `Args:`/`Returns:`.
 - Keep the legacy model formats (see the exports decision in [8.2](#82-decisions-by-topic)); CharLES and the
   exporters depend on them.

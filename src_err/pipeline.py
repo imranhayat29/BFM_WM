@@ -1,7 +1,7 @@
 """
 Shared a-priori prediction pipeline of the BFM wall model with error model and SNGP confidence
 
-Used by test_turb.py, test_lamturb.py and tools/apriori_benchmark.py. One pass gives, per point:
+Used by test_turb.py, test_lamturb.py and test_turb_allcases.py. One pass gives, per point:
 
     baseline   y_b = |NN_b(pi)|                       (raw output kept as y_base_raw)
     error      (mu, sigma) = error model(pi)          (pi_out units)
@@ -308,7 +308,7 @@ def evaluate(out: Dict[str, np.ndarray], y_true: np.ndarray, pi1: np.ndarray,
 def predict_turb(models: BranchModels, arrays: DatasetArrays, cfg: Mapping[str, Any],
                  verbose: bool = True) -> Dict[str, np.ndarray]:
     """
-    Turbulent-only pipeline (test_turb.py, apriori_benchmark.py); all points are turbulent
+    Turbulent-only pipeline (test_turb.py, test_turb_allcases.py); all points are turbulent
 
     Args:
         models: BranchModels

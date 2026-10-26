@@ -57,7 +57,7 @@ PosthocGroups = { "APG TBL" = ["APG", "Curved BL APG"], "FPG TBL" = ["FPG", "NAS
 DisplayNames  = { CH = "ZPG TBL", FS_ZPG = "Viscous ZPG", FS_APG = "Viscous APG", FS_FPG = "Viscous FPG", transition_JHU_transition = "Transition BL" }
 
 [plots]
-SpatialMaps = true   # Scatter maps over (x, n1/delta): |e%| baseline/corrected (blended)/EQWM, |mu%|, sigma%, C, class labels (map_*)
+SpatialMaps = false  # Scatter maps over (x, n1/delta) of the tri_* fields: |e%| baseline/corrected (blended)/EQWM, |mu%|, sigma%, C, class labels (map_*)
 CfLines     = true   # |C_f| along x at one n1 station per x, raw and moving-averaged (cf_lines, cf_lines_ma)
 Pdfs        = true   # PDFs of |e%| (baseline, corrected = blended, EQWM) and of C (pdf_errors, pdf_confidence)
 Tripcolor   = true   # Smoothed tripcolor maps with OOD / near-wall-fallback hatching (tri_*)
@@ -70,7 +70,7 @@ XLim         = []                # x-axis limits ([] = data range)
 VMin         = 1.0               # Lower limit of the logarithmic colour scales (%)
 VMax         = 100.0             # Upper limit of the logarithmic colour scales (%)
 MarkerSize   = 10.0              # Scatter marker size
-ShowSelected = true              # Overlay the selected n1 stations (red) on the baseline and label maps
+ShowSelected = false             # Mark the n1 stations of the C_f line plots (red) on the baseline and label maps; --show-cf-stations sets it
 
 [plots.cf_lines]
 Selection     = "raw"            # n1 station per x: "raw" (n1 closest to Value), "normalized" (Value in [0, 1] of the local n1 range),
@@ -100,4 +100,4 @@ GridNy       = 150               # Smoothing grid points in n1/delta
 Sigma        = 3.0               # Gaussian-filter width in grid cells (0 = no smoothing)
 VMin         = 1.0               # Lower limit of the logarithmic colour scales (%)
 VMax         = 100.0             # Upper limit of the logarithmic colour scales (%)
-ShowSelected = true              # Overlay the selected n1 stations on the baseline map
+ShowSelected = false             # Mark the n1 stations of the C_f line plots (red) on the baseline map; --show-cf-stations sets it

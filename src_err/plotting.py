@@ -262,10 +262,10 @@ def plot_spatial_maps(x: np.ndarray, n1: np.ndarray, delta: Optional[np.ndarray]
         class_names: display names in label order (may already contain 'OOD').
         opts: ``[plots.maps]``: YAxis ('n1_over_delta' | 'n1', default 'n1_over_delta'),
             YLim ([0, 0.2]), RawN1YLim ([0, 0.005]), VMin (1), VMax (100), MarkerSize (10),
-            ShowSelected (true), XLim (optional, default auto).
+            ShowSelected (false), XLim (optional, default auto).
         prefix: file-name prefix (e.g. a dataset tag).
         out_dir, formats: saving (None: no saving).
-        selected_idx: indices of the selected n1 stations, overlaid in red on the
+        selected_idx: indices of the n1 stations of the C_f line plots, overlaid in red on the
             'baseline' and 'labels' maps when ShowSelected.
         ood_mask: points relabelled 'OOD' in the label map (C below the confidence threshold).
         raw_n1: raw-n1 family ('map_rawn1_<field>', y = n1, ylim RawN1YLim, 15x3 figures).
@@ -278,7 +278,7 @@ def plot_spatial_maps(x: np.ndarray, n1: np.ndarray, delta: Optional[np.ndarray]
     opts = dict(opts or {})
     vmin, vmax = float(opts.get("VMin", 1.0)), float(opts.get("VMax", 100.0))
     ms = float(opts.get("MarkerSize", 10))
-    show_sel = bool(opts.get("ShowSelected", True)) and selected_idx is not None
+    show_sel = bool(opts.get("ShowSelected", False)) and selected_idx is not None
     x = np.asarray(x, dtype=float).ravel()
     n1 = np.asarray(n1, dtype=float).ravel()
     if raw_n1:
@@ -733,7 +733,7 @@ def plot_tripcolor_maps(x: np.ndarray, n1_over_delta: np.ndarray, fields: Mappin
                         masks: Optional[Mapping[str, np.ndarray]] = None,
                         opts: Optional[Mapping] = None, prefix: str = "", *,
                         out_dir: Optional[str] = None, formats: Sequence[str] = ("png",),
-                        selected_idx: Optional[np.ndarray] = None, show_selected: bool = True,
+                        selected_idx: Optional[np.ndarray] = None, show_selected: bool = False,
                         xlabel: str = r"$x$", ylabel: str = r"$n_1/\delta$",
                         close: bool = True) -> Dict[str, plt.Figure]:
     """Smoothed tripcolor maps over (x, n1/delta) (faithful port of LT-NB cell 78).
@@ -756,8 +756,9 @@ def plot_tripcolor_maps(x: np.ndarray, n1_over_delta: np.ndarray, fields: Mappin
             Sigma (3.0), XLim (optional, default data range), VMin (1), VMax (100).
         prefix: file-name prefix; files '<prefix>_tri_<field>', '<prefix>_tri_labels'.
         out_dir, formats: saving.
-        selected_idx: selected-station indices, overlaid on the 'baseline' map.
-        show_selected: draw the overlay when selected_idx is given.
+        selected_idx: indices of the n1 stations of the C_f line plots, overlaid in red on the
+            'baseline' map when show_selected.
+        show_selected: draw the overlay ([plots.tripcolor] ShowSelected).
         xlabel, ylabel: axis labels.
         close: close figures after saving.
 

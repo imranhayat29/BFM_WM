@@ -267,7 +267,7 @@ def test_schema(variant: str) -> Dict[str, Any]:
         "gates": _gates_schema(variant),
         "metrics": {"LowValue": _ramp(2.0, 1.0)},
         "plots": {
-            "SpatialMaps": Key("bool", True),
+            "SpatialMaps": Key("bool", False),  # map_*: scatter versions of the tri_* maps
             "CfLines": Key("bool", True),
             "Pdfs": Key("bool", True),
             "Tripcolor": Key("bool", True),
@@ -278,7 +278,7 @@ def test_schema(variant: str) -> Dict[str, Any]:
                 "VMin": Key("float", 1.0, check=_positive),
                 "VMax": Key("float", 100.0, check=_positive),
                 "MarkerSize": Key("float", 10.0, check=_positive),
-                "ShowSelected": Key("bool", True),
+                "ShowSelected": Key("bool", False),  # red C_f-line stations; --show-cf-stations
                 "XLim": Key("list[float]", [], check=_pair_or_empty),  # [] = data range
             },
             "cf_lines": {
@@ -309,7 +309,7 @@ def test_schema(variant: str) -> Dict[str, Any]:
                 "XLim": Key("list[float]", [0.0, 1.0] if lamturb else [], check=_pair_or_empty),  # [] = data range
                 "VMin": Key("float", 1.0, check=_positive),
                 "VMax": Key("float", 100.0, check=_positive),
-                "ShowSelected": Key("bool", True),
+                "ShowSelected": Key("bool", False),  # red C_f-line stations; --show-cf-stations
             },
         },
     }

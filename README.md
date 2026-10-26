@@ -185,20 +185,23 @@ python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --
 ### 3. A-priori testing
 
 ```bash
-python test_turb.py test/test_turb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
-python test_lamturb.py test/test_lamturb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
+python test_turb.py test/test_turb.toml [--gpu N] [--output-dir DIR] [--max-samples N] [--show-cf-stations]
+python test_lamturb.py test/test_lamturb.toml [--gpu N] [--output-dir DIR] [--max-samples N] [--show-cf-stations]
 ```
 
 - The options override `[general] GpuNum`, `[general] OutputDir` and `[data] MaxSamples` (a deterministic,
   evenly spaced sample cap for quick runs; 0 = all points).
+- `--show-cf-stations` marks the n1 stations of the $|C_f|$ line plots in red on the maps. It sets `ShowSelected`
+  in `[plots.tripcolor]` and `[plots.maps]`, which are off by default.
 - As in training, the TOML, every test dataset file and every model are checked before the models are loaded.
 
 The output directory (`[general] OutputDir`) receives:
-- spatial maps of the errors, σ, confidence and class labels (`map_*`), and raw-n1 maps of the laminar
-  region for lam-turb;
+- smoothed tripcolor maps of the errors, σ, confidence and class labels, with the OOD and near-wall-fallback
+  regions hatched (`tri_*`);
 - $|C_f|$ line plots at one n1 station per x (`cf_lines*`);
 - error and confidence PDFs (`pdf_*`);
-- smoothed tripcolor maps with the OOD and near-wall-fallback regions hatched (`tri_*`);
+- only with `[plots] SpatialMaps = true`: scatter maps of the same fields (`map_*`), and for lam-turb raw-n1
+  maps of the laminar region (`map_rawn1_*`);
 - `summary.json`, with error statistics overall and per dataset, blend diagnostics, class counts and the
   lam/turb switch counts;
 - optionally (`[general] SaveArrays = true`) `arrays.npz`, with every per-point field.
@@ -422,7 +425,7 @@ turbulent-only / lam-turb.
 | `[gates]` | `Aleatoric` (`Type = "percentage"`, threshold `10` / `15` ± `5`; `Type = "ratio"` defaults to `1.0` ± `0.5`), `Confidence` (`0.7` ± `0.05` / `0.85` ± `0.1`), `Yplus` (`4` ± `2`), `LowValue` (`2` ± `1`) |
 | `[metrics]` | `LowValue` (`2` ± `1`): low-value blend of the evaluation percent errors |
 | `[switch]` (lam-turb) | `KtKmThreshold` (`0.002`): a point is laminar if `kt_km` ≤ threshold |
-| `[plots]` | `SpatialMaps`, `CfLines`, `Pdfs`, `Tripcolor` (all `true`), and per-figure tables `[plots.maps]`, `[plots.cf_lines]`, `[plots.pdfs]`, `[plots.tripcolor]` (axes, colour ranges, station selection) |
+| `[plots]` | `SpatialMaps` (`false`), `CfLines`, `Pdfs`, `Tripcolor` (`true`), and per-figure tables `[plots.maps]`, `[plots.cf_lines]`, `[plots.pdfs]`, `[plots.tripcolor]` (axes, colour ranges, station selection; `ShowSelected` (`false`) in the map tables marks the $|C_f|$ line-plot stations) |
 
 The gate entries are inline tables, e.g. `Confidence = { Threshold = 0.7, Delta = 0.05 }`.
 

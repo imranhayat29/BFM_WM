@@ -153,7 +153,23 @@ def parse_test_args(argv: Optional[Sequence[str]], description: str, example: st
     parser.add_argument("--output-dir", default=None, help="output directory; overrides [general].OutputDir")
     parser.add_argument("--max-samples", type=int, default=None,
                         help="deterministic sample cap (0 = all); overrides [data].MaxSamples")
+    parser.add_argument("--show-cf-stations", action="store_true",
+                        help="mark the n1 stations of the C_f line plots (red) on the map_* and tri_* maps; "
+                             "sets [plots.maps] and [plots.tripcolor] ShowSelected")
     return parser.parse_args(argv)
+
+
+def apply_plot_flags(args: argparse.Namespace, cfg: Dict[str, Any]) -> None:
+    """
+    Apply the plot flags of the test command line to a loaded test config (in place)
+
+    Args:
+        args: Parsed arguments of parse_test_args
+        cfg: Test config; --show-cf-stations sets ShowSelected in [plots.maps] and [plots.tripcolor]
+    """
+    if args.show_cf_stations:
+        for table in ("maps", "tripcolor"):
+            cfg["plots"][table]["ShowSelected"] = True
 
 
 # ---------------------------------------------------------------------------------------

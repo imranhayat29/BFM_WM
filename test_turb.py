@@ -1,7 +1,7 @@
 """
 A-priori test of the turbulent BFM wall model with error model, SNGP confidence and EQWM fallback
 
-    python test_turb.py test/test_turb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
+    python test_turb.py test/test_turb.toml [--gpu N] [--output-dir DIR] [--max-samples N] [--show-cf-stations]
 
 Runs the baseline, the error model and the SNGP on the test datasets, blends the corrected
 prediction with the baseline and the EQWM fallback (CharLES BFMv2 3-switch blend, inference
@@ -14,7 +14,7 @@ import time
 
 import src_err.utils as utils  # sets the TensorFlow environment before TF is imported
 
-from src_err.cli import check_inputs, parse_test_args, select_gpu
+from src_err.cli import apply_plot_flags, check_inputs, parse_test_args, select_gpu
 
 import matplotlib
 
@@ -30,6 +30,7 @@ def main(argv=None) -> None:
         check_inputs([cfg])
     except (ValueError, FileNotFoundError) as exc:
         sys.exit(f"ERROR: {exc}")
+    apply_plot_flags(args, cfg)
     from src_err.data import load_datasets
     from src_err.pipeline import class_names_for_plot, load_branch_models, predict_turb
     from src_err.reporting import build_test_summary, make_test_figures, print_test_config, save_test_outputs
@@ -67,7 +68,7 @@ def main(argv=None) -> None:
 
     summary = build_test_summary(out, arrays, cfg, {"turb": models}, class_names, labels,
                                  cli={"config": args.config, "gpu": gpu, "output_dir": out_dir,
-                                      "max_samples": max_samples},
+                                      "max_samples": max_samples, "show_cf_stations": args.show_cf_stations},
                                  figures=figures, timings=timings)
     save_test_outputs(out, arrays, summary, class_names, cfg, out_dir)
     print("=" * 80)

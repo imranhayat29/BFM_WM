@@ -265,6 +265,7 @@ benchmark" means this script.
 | SNGP dropout | `dropout_rate=0.1` never applied (`training` not propagated) | applied | `DropoutActive = false` | intended regularisation |
 | EQWM | parent `log_law_solve` (log law + near-wall cubic below y+ 23) | CharLES two-layer law (u+ = y+ for y+ <= 11.0623, else ln(y+)/0.41 + 5.2) | `[eqwm] Law = "parent"` | parity with CharLES |
 | Aleatoric gate metric | `'percentage'` or `'ratio'` | `"percentage"` with the low-value blend | `Type = "ratio"` (set Threshold 1.0, Delta 0.5) | — |
+| Test maps | scatter maps (incl. raw-n1 for lam-turb) and tripcolor maps, with the C_f-line stations in red | tripcolor maps only, no station markers | `[plots] SpatialMaps = true`; `ShowSelected = true` in `[plots.maps]`/`[plots.tripcolor]` or `--show-cf-stations` | the scatter maps repeat the tripcolor fields (owner's choice, 2026-10-25) |
 
 The reference SNGPs were trained with the `"step"` / inactive-dropout behaviour.
 
@@ -506,7 +507,8 @@ first push so that no commit contains them; the README is cluster-neutral (venv 
 **Testing and evaluation**
 - Truth = dataset targets; % errors use the same low-value blend (2±1 on |π_out,true|) for every prediction incl. EQWM.
 - Turbulent SNGP ep4000 in both test scripts; ep5000 kept in `models/` but unused.
-- Figures: spatial maps, C_f lines, PDFs, smoothed tripcolor maps, each switchable; `summary.json`; optional
+- Figures: smoothed tripcolor maps, C_f lines and PDFs by default; the scatter maps (`SpatialMaps`, incl. raw-n1)
+  and the C_f-station markers (`ShowSelected`, `--show-cf-stations`) on request; `summary.json`; optional
   `arrays.npz`.
 - Output naming kept from the notebooks: "corrected" in test outputs = the blended y_final; "always corrected" = y_corr.
 

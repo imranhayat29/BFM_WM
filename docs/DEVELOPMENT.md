@@ -60,15 +60,15 @@ a-posteriori class import, ...) were not ported. To read a notebook as a script:
 
   | Commit | Content |
   |---|---|
-  | `22d60f6` | Port the fork's changes to the parent package (`src/`, `wall_model_cases.py`, `plot_utils.py`, `train_wm_proposal.py`) |
-  | `7e19ad6` | Training data of the fork (git-lfs), see [section 5](#5-data-provenance) |
-  | `b26286f` | `src_err/` |
-  | `d48da23` | Training scripts and TOMLs |
-  | `11332b4` | Test scripts and TOMLs |
-  | `f65de67` | CharLES exporters and the a-priori benchmark |
-  | `5eb44fb` | README and requirements |
-  | `c459004` | Final-review fixes (single baseline-output helper, consistent model checks, docs); last commit whose TOMLs carry the notebook pointers |
-  | `9acf1e8` | User docs for fresh users (no notebook references); this file; absolute path of the lam-turb test set |
+  | `47b6768` | Port the fork's changes to the parent package (`src/`, `wall_model_cases.py`, `plot_utils.py`, `train_wm_proposal.py`) |
+  | `e5e2d92` | Training data of the fork (git-lfs), see [section 5](#5-data-provenance) |
+  | `7708c8a` | `src_err/` |
+  | `32e59f8` | Training scripts and TOMLs |
+  | `5a08d21` | Test scripts and TOMLs |
+  | `97e7af9` | CharLES exporters and the a-priori benchmark |
+  | `7e2a19d` | README and requirements |
+  | `2028cfb` | Final-review fixes (single baseline-output helper, consistent model checks, docs); last commit whose TOMLs carry the notebook pointers |
+  | `552c74a` | User docs for fresh users (no notebook references); this file; absolute path of the lam-turb test set |
 
   Later commits: `git log upstream/master..v2`.
 
@@ -395,9 +395,9 @@ Before the user docs were cleaned, every TOML carried per-key notebook pointers 
 `EVB thresh_err_change 0.1`, `TURB-NB used ..._ep5000_merged`, `LT-NB cell 78`). They are kept in two places:
 
 - `docs/dev_local/inputfiles_annotated/` (git-ignored, local only; same tree as `inputfiles/`);
-- git history: `git show c459004:inputfiles/<path>`, e.g. `git show c459004:inputfiles/sngp/sngp_turb.toml`.
+- git history: `git show 2028cfb:inputfiles/<path>`, e.g. `git show 2028cfb:inputfiles/sngp/sngp_turb.toml`.
 
-To compare with the current files: `git diff c459004 -- inputfiles/`. The important pointers are also in
+To compare with the current files: `git diff 2028cfb -- inputfiles/`. The important pointers are also in
 [3.2](#32-notebook-flags-to-toml-keys) and [3.3](#33-notebook-values-that-differ-from-the-v2-tomls).
 
 ---
@@ -626,7 +626,7 @@ v2-trained (smoke) models; the SNGP bundle has the same keys as the reference on
 - `parent` EQWM law matches `src/baseline_models.log_law_solve` to 6e-14.
 - Smoke models trained before the data correction were stale (turbulent SNGP mean 955, error mean 2.8); regenerated
   13:26 on 2026-10-25.
-- Latent issue fixed in `c459004`: training and inference used two helpers for the raw baseline output
+- Latent issue fixed in `2028cfb`: training and inference used two helpers for the raw baseline output
   (LogTransform handled only at inference); now one helper, `data.baseline_output`.
 
 The review reports and check scripts lived in a temporary session directory and are not preserved; the results
@@ -757,7 +757,7 @@ sys.exit(1 if bad else 0)
 
 ### 12.1 Trainings
 
-The default training TOMLs at `c459004`, trained on P100 GPUs (normal QOS) on 2026-10-25 with the cluster job recipe
+The default training TOMLs at `2028cfb`, trained on P100 GPUs (normal QOS) on 2026-10-25 with the cluster job recipe
 of the README. The `[turb]` branch of `error_lamturb.toml` has the same recipe and seed as `error_turb.toml` and was not
 trained separately. Outputs: `models/*_v2` on the cluster (git-ignored).
 

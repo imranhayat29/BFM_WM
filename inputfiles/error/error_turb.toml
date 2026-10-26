@@ -10,20 +10,20 @@
 # the statistics are saved as assets/error_norm_stats.json (legacy format read by the exporters and CharLES tools).
 
 [general]
-# Output directory name under SaveDir (required). Reference model (./models/, read-only), for comparison:
+# Output directory name under SaveDir (required). Reference model (./models/error/, read-only), for comparison:
 #   error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811
 #   ('ep3811' = best validation epoch of a 10000-epoch run, restored at the end of training)
 ModelName = "error_model_turb_v2"
-SaveDir   = "./models"   # directory receiving <ModelName>/ (SavedModel + assets/) and checkpoints/<ModelName>/ (snapshots)
+SaveDir   = "./models/error"   # directory receiving <ModelName>/ (SavedModel + assets/) and checkpoints/<ModelName>/ (snapshots)
 Save      = true         # false: train and write diagnostics only
 Overwrite = false        # true: replace an existing <SaveDir>/<ModelName> and its snapshots
 GpuNum    = 0            # GPU index for TensorFlow and torch; -1 = CPU (the CLI option --gpu overrides it)
 Seed      = 1234         # seeds the splits, weight initialisation and shuffling (required)
 
 [baseline]
-# Baseline wall-model checkpoint (file in ./models or a path; required); must equal the SNGP TOML's when both
+# Baseline wall-model checkpoint (path relative to ./models, e.g. baseline/<file>.pth, or any path; required); must equal the SNGP TOML's when both
 # are trained together.
-Checkpoint = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Checkpoint = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 
 [data]
 # Additional datasets added to the error-model training data. [] = none. The list below is the external-flow

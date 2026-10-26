@@ -18,7 +18,7 @@ Dense kernel layout matches Keras: y = x @ W + b, so W has shape (in_dim, out_di
 
 Example usage: (run from the BFM_WM_v2 repo root)
 python tools/export_error_model_to_npz.py
-       --model_dir ./models/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811
+       --model_dir ./models/error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811
        --out       ./results/export/error_turb/error_model_params.json
 """
 

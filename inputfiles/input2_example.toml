@@ -6,7 +6,7 @@
 Verbose = 1             # Verbosity level (0: quiet, 1: informational, 2: debug)
 UseWandb = true        # Whether to use Weights & Biases for experiment tracking
 Save = true             # Whether to save trained models
-SaveDir = "./models"    # Directory to save models
+SaveDir = "./models/baseline"    # Directory to save models (in a subfolder per run)
 GpuNum = 0             # GPU index (train_wm_proposal.py needs a CUDA GPU; -1/CPU is not supported)
 WandbName = "Input2_example"
 

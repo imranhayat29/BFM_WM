@@ -16,8 +16,7 @@ Run every script from the repository root (`python tools/<script>.py ...`) with 
 ## Exporting models to CharLES BFMv2
 
 CharLES BFMv2 compiles the wall-model networks in as constant arrays, in the files
-`src/charles/BFM_*_data_*.{hpp,cu}` of its source tree (on the cluster:
-`<CharLES_BFMv2 checkout>`). The export scripts write these files from the models of
+`src/charles/BFM_*_data_*.{hpp,cu}` of its source tree (not part of this repository). The export scripts write these files from the models of
 this repository:
 
 | Model | Step 1 | Step 2 | CharLES files |
@@ -35,7 +34,7 @@ a block of `#define` lines at the top of each `.cu` (e.g. `W_in_sngp -> W_in_sng
 laminar variants can be linked together, and their headers declare the sizes as `static const int` with a
 `_turb`/`_lam` suffix. Re-apply these edits when you drop newly exported files into CharLES.
 
-**Where to write.** The examples below export the turbulent reference models (the pretrained models in `./models/`)
+**Where to write.** The examples below export the turbulent reference models (the pretrained models in `./models/sngp/`, `./models/error/` and `./models/baseline/`)
 into `./results/export/` (git-ignored); every exporter creates the parent directories of its outputs. Do not write
 into the reference model directories: their `assets/` already hold the bundles of the reference models
 (`sngp_params.npz`, `sngp_params_meta.json`, `error_model_params.json`). The examples reproduce these files
@@ -62,7 +61,7 @@ Requirements on the model directory: `<model_dir>/assets/metadata.json` with the
 
 ```bash
 python tools/export_sngp_to_npz.py \
-  --model_dir ./models/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged \
+  --model_dir ./models/sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged \
   --out_npz ./results/export/sngp_turb/sngp_params.npz \
   --also_write_json ./results/export/sngp_turb/sngp_params_meta.json
 ```
@@ -95,7 +94,7 @@ Requirements on the model directory: `<model_dir>/assets/error_norm_stats.json` 
 
 ```bash
 python tools/export_error_model_to_npz.py \
-  --model_dir ./models/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811 \
+  --model_dir ./models/error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811 \
   --out ./results/export/error_turb/error_model_params.json
 ```
 
@@ -129,6 +128,6 @@ baseline wall models.
 
 ```bash
 python tools/export_baseline_to_cuda_datafiles.py \
-  --checkpoint ./models/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth \
+  --checkpoint ./models/baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth \
   --out_hpp ./results/export/BFM_wall_data_turb.hpp --out_cu ./results/export/BFM_wall_data_turb.cu
 ```

@@ -27,7 +27,7 @@ The output is meant as a parameter bundle; it does NOT generate CUDA kernels.
 
 Example usage: (run from the BFM_WM_v2 repo root)
 python tools/export_sngp_to_npz.py 
-        --model_dir ./models/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged 
+        --model_dir ./models/sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged 
         --out_npz ./results/export/sngp_turb/sngp_params.npz 
         --also_write_json ./results/export/sngp_turb/sngp_params_meta.json
 """

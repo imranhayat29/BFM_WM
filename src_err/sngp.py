@@ -564,7 +564,7 @@ def load_sngp(path: str) -> SngpBundle:
     """Load an SNGP SavedModel (legacy or v2) and its metadata.
 
     Args:
-        path: Model directory, or a name under ./models
+        path: Model directory: a path relative to ./models (e.g. sngp/<name>) or any path
 
     Returns:
         SngpBundle

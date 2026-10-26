@@ -7,10 +7,26 @@ results/
 wandb/
 old_scripts/
 tests/
-models/
 dummy/
 dummy
 apost/
 apost
 # Local developer files (not versioned): e.g. docs/dev_local/inputfiles_annotated, see docs/DEVELOPMENT.md
 docs/dev_local/
+# models/: only the reference models are tracked (git-lfs, models/.gitattributes); models trained locally
+# (e.g. the *_v2 defaults of the training TOMLs) and error-model snapshots are ignored
+/models/*
+!/models/.gitattributes
+!/models/baseline/
+!/models/sngp/
+!/models/error/
+/models/*/*
+!/models/baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth
+!/models/baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth
+!/models/sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged/
+!/models/sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged/
+!/models/sngp/sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged/
+!/models/error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811/
+!/models/error/error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000/
+# Lam-turb test set (not distributed): a local copy or link in data/ must not be committed
+/data/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5

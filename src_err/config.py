@@ -95,13 +95,14 @@ def _ramp(threshold: float, delta: float, enum_type: Optional[List[str]] = None,
 # used when Type = "ratio" is given without Threshold/Delta.
 ALEATORIC_RATIO_DEFAULTS = {"Threshold": 1.0, "Delta": 0.5}
 
-SHIPPED_TURB_BASELINE = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
-SHIPPED_LAM_BASELINE = ("NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_"
+# Reference models, relative to ./models (baseline/, sngp/ and error/ hold the three kinds of model)
+SHIPPED_TURB_BASELINE = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+SHIPPED_LAM_BASELINE = ("baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_"
                         "ep30000_tl0.00032144_vl0.00031670.pth")
-SHIPPED_TURB_SNGP = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
-SHIPPED_LAM_SNGP = "sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged"
-SHIPPED_TURB_ERROR = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
-SHIPPED_LAM_ERROR = "error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000"
+SHIPPED_TURB_SNGP = "sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
+SHIPPED_LAM_SNGP = "sngp/sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged"
+SHIPPED_TURB_ERROR = "error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+SHIPPED_LAM_ERROR = "error/error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000"
 
 FIGURE_FORMATS = ["png", "pdf", "svg", "jpg", "eps"]
 # PDF estimators of src_err/plotting.py ('hist' is an alias of 'histogram')
@@ -112,10 +113,11 @@ PDF_METHODS = ["kde", "histogram", "hist", "both"]
 # ---------------------------------------------------------------------------------------
 
 
-def _training_general_schema() -> Dict[str, Any]:
+def _training_general_schema(kind: str) -> Dict[str, Any]:
+    # Trained models go next to the reference models of their kind: ./models/sngp or ./models/error
     return {
         "ModelName": Key("str"),
-        "SaveDir": Key("str", "./models"),
+        "SaveDir": Key("str", f"./models/{kind}"),
         "Save": Key("bool", True),
         "Overwrite": Key("bool", False),
         "GpuNum": Key("int", 0),
@@ -141,7 +143,7 @@ def sngp_schema() -> Dict[str, Any]:
         "RecomputeNorm": Key("bool", False),
     })
     return {
-        "general": _training_general_schema(),
+        "general": _training_general_schema("sngp"),
         "baseline": {"Checkpoint": Key("str")},
         "data": data,
         "classes": {
@@ -174,7 +176,7 @@ def sngp_schema() -> Dict[str, Any]:
 def error_schema() -> Dict[str, Any]:
     """Schema of a turbulent-only error-model TOML (and of each branch of error_lamturb.toml)."""
     return {
-        "general": _training_general_schema(),
+        "general": _training_general_schema("error"),
         "baseline": {"Checkpoint": Key("str")},
         "data": _training_data_schema(),
         "model": {

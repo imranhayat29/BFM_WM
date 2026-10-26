@@ -15,11 +15,11 @@ GpuNum     = 0                                 # GPU index for torch and TensorF
 SaveArrays = false                             # Also write arrays.npz with every per-point field (predictions, errors, x, n1, ...)
 
 [models]
-# Names under ./models/ (or paths): the reference turbulent models that CharLES BFMv2 runs. The 5000-epoch SNGP
-# sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged in ./models/ is an alternative.
-Baseline = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
-Sngp     = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
-Error    = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+# Paths relative to ./models/ (baseline/, sngp/, error/) or any path: the reference turbulent models that CharLES BFMv2 runs. The 5000-epoch SNGP
+# sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged is an alternative.
+Baseline = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Sngp     = "sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
+Error    = "error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
 
 [data]
 Datasets   = ["gaussian_2M_APG", "gaussian_2M_FPG", "gaussian_2M_SEP", "gaussian_2M_MAPG"]   # Test dataset keys (wall_model_cases.py registry or ./data/<key>_data.h5)

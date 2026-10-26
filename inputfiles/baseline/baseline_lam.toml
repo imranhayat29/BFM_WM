@@ -1,6 +1,6 @@
 # Baseline BFM wall model, laminar branch of the laminar-turbulent workflow.
 # This is the configuration embedded in the reference checkpoint
-# models/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth.
+# models/baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth.
 # With upy >= 1 the data loader (src/data_handler.py) applies no n1/delta window, so downy has no effect here.
 # Train with:  python train_wm_proposal.py baseline/baseline_lam.toml
 
@@ -8,7 +8,7 @@
 Verbose = 1
 UseWandb = false   # Weights & Biases tracking (the reference checkpoint used false)
 Save = true
-SaveDir = "./models"
+SaveDir = "./models/baseline"
 GpuNum = 0         # GPU index (train_wm_proposal.py needs a CUDA GPU)
 Seed = 1234        # Seeds the train/valid split and the weights (the reference checkpoint was trained unseeded)
 WandbName = "Input2_laminar"

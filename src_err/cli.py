@@ -188,7 +188,7 @@ def missing_model(role: str, name: str) -> Optional[str]:
     Args:
         role: 'Baseline' (checkpoint file, data.load_baseline_model), 'Sngp' (sngp.load_sngp) or
               'Error' (error_model.load_error_model); the last two are SavedModel directories
-        name: Model name under ./models or a path
+        name: Path relative to ./models (e.g. sngp/<name>) or any path
 
     Returns:
         The message, or None if the model exists

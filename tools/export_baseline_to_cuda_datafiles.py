@@ -28,7 +28,7 @@ config resolves to:
 
 Example usage: (run from the BFM_WM_v2 repo root)
 python tools/export_baseline_to_cuda_datafiles.py
-       --checkpoint ./models/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth
+       --checkpoint ./models/baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth
        --out_hpp    ./results/export/BFM_wall_data_lam.hpp
        --out_cu     ./results/export/BFM_wall_data_lam.cu
 """

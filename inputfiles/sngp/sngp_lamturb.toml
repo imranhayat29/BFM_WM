@@ -8,7 +8,7 @@
 # set per branch. Kt/Km is not used in training (the lam/turb hard switch is applied at test time / in CharLES).
 
 [general]
-SaveDir   = "./models"   # directory receiving <ModelName>/
+SaveDir   = "./models/sngp"   # directory receiving <ModelName>/
 Save      = true         # false: train and write diagnostics only
 Overwrite = false        # true: replace existing model directories
 GpuNum    = 0            # GPU index; -1 = CPU (the CLI option --gpu overrides it)
@@ -18,12 +18,12 @@ Seed      = 1234         # seeds splits, weights, shuffling and dropout
 # Laminar branch: laminar baseline (FS_ZPG/APG/FPG) + laminar A-airfoil additional data
 # =====================================================================================================
 [lam.general]
-# Reference model (./models/, read-only), for comparison:
+# Reference model (./models/sngp/, read-only), for comparison:
 #   sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged
 ModelName = "sngp_model_lam_v2"
 
 [lam.baseline]
-Checkpoint = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
+Checkpoint = "baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
 
 [lam.data]
 # Laminar regions of the A-airfoil 2M case (h5 case names aairfoil_laminar_{ZPG,APG,FPG}), n1/delta in [0.02, 0.8]
@@ -72,12 +72,12 @@ ClassWeights    = "balanced"
 # Turbulent branch: same recipe as sngp/sngp_turb.toml, 4000 epochs (the SNGP deployed in CharLES BFMv2)
 # =====================================================================================================
 [turb.general]
-# Reference model (./models/, read-only), for comparison:
+# Reference model (./models/sngp/, read-only), for comparison:
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged
 ModelName = "sngp_model_lamturb_turb_v2"
 
 [turb.baseline]
-Checkpoint = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Checkpoint = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 
 [turb.data]
 AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",

@@ -483,7 +483,7 @@ def load_error_model(path: str) -> ErrorBundle:
     cloudpickled Python 3.11 bytecode, so the same Python minor version is required.
 
     Args:
-        path: Model directory, or a name under ./models
+        path: Model directory: a path relative to ./models (e.g. error/<name>) or any path
 
     Returns:
         ErrorBundle

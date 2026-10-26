@@ -8,7 +8,7 @@
 # Kt/Km is not used in training (the lam/turb hard switch is applied at test time / in CharLES).
 
 [general]
-SaveDir   = "./models"   # directory receiving <ModelName>/ and checkpoints/<ModelName>/
+SaveDir   = "./models/error"   # directory receiving <ModelName>/ and checkpoints/<ModelName>/
 Save      = true         # false: train and write diagnostics only
 Overwrite = false        # true: replace existing model directories and snapshots
 GpuNum    = 0            # GPU index; -1 = CPU (the CLI option --gpu overrides it)
@@ -18,12 +18,12 @@ Seed      = 1234         # seeds splits, weights and shuffling
 # Laminar branch
 # =====================================================================================================
 [lam.general]
-# Reference model (./models/, read-only), for comparison:
+# Reference model (./models/error/, read-only), for comparison:
 #   error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000
 ModelName = "error_model_lam_v2"
 
 [lam.baseline]
-Checkpoint = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
+Checkpoint = "baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
 
 [lam.data]
 # Laminar regions of the A-airfoil 2M case, n1/delta in [0.005, 1]: the data of the reference model ('UPY1' in its
@@ -61,12 +61,12 @@ SaveInterval = 1000          # SavedModel every N epochs in <SaveDir>/checkpoint
 # Turbulent branch: same recipe as error/error_turb.toml
 # =====================================================================================================
 [turb.general]
-# Reference model (./models/, read-only), for comparison:
+# Reference model (./models/error/, read-only), for comparison:
 #   error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811
 ModelName = "error_model_lamturb_turb_v2"
 
 [turb.baseline]
-Checkpoint = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Checkpoint = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 
 [turb.data]
 AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",

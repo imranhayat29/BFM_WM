@@ -70,7 +70,7 @@ def load_branch_models(models_cfg: Mapping[str, str], classes_cfg: Optional[Mapp
     otherwise from the SNGP metadata (`bfmwm_v2` block; empty for the shipped legacy models).
 
     Args:
-        models_cfg: `[models]` table (Baseline, Sngp, Error; names under ./models or paths)
+        models_cfg: `[models]` table (Baseline, Sngp, Error; paths relative to ./models or any paths)
         classes_cfg: `[classes]` table (PosthocGroups, DisplayNames; None entries = metadata)
         device: torch device of the baseline
         branch: 'turb' or 'lam'

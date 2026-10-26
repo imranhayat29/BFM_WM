@@ -28,11 +28,15 @@ Contents:
 | Name | Location | Role |
 |---|---|---|
 | upstream | [github.com/yuenongling/BFM_WM](https://github.com/yuenongling/BFM_WM), remote `upstream` | Baseline BFM wall model: `src/`, `train_wm_proposal.py`, `test_model*.py`, `wall_model_cases.py`, `data/` (git-lfs) |
-| notebook fork, "BFM_WM" | [github.com/imranhayat29/BFM_WM](https://github.com/imranhayat29/BFM_WM), branch `wip-bfm-error-model`; local copy `<local clone of BFM_WM>` (treat as read-only) | The owner's fork that added the error model, the SNGP and the blended correction, driven by Jupyter notebooks (`src_err/*.py` helpers, notebooks at the top level) |
-| BFM_WM_v2 (this repo) | `<this repository>` | Clone of upstream plus a script/TOML refactor of the notebook fork |
-| expert script | `BFM_WM/test_expert_model.py`; standalone copy `<local copy of BFM_WM_expert>` | Earlier inference-only script of the blended model (argparse, `--gating-reference`); a reference for the test scripts' `summary.json` |
-| data generation | [github.com/yuenongling/WM_data_creation](https://github.com/yuenongling/WM_data_creation); local `<local clone of WM_data_creation>` | Creates the HDF5 datasets; the place to regenerate data in another frame (see [9.3](#93-remaining-difference-the-input-sign-frame)) |
-| CharLES BFMv2 | `<CharLES_BFMv2 checkout>` (local git) | LES solver that deploys the exported models |
+| notebook fork, "BFM_WM" | [github.com/imranhayat29/BFM_WM](https://github.com/imranhayat29/BFM_WM), branch `wip-bfm-error-model`; a local clone (treat as read-only) | The owner's fork that added the error model, the SNGP and the blended correction, driven by Jupyter notebooks (`src_err/*.py` helpers, notebooks at the top level) |
+| BFM_WM_v2 (this repo) | branch `v2` of [github.com/imranhayat29/BFM_WM](https://github.com/imranhayat29/BFM_WM), remote `origin` | Clone of upstream plus a script/TOML refactor of the notebook fork |
+| expert script | `BFM_WM/test_expert_model.py`; a standalone copy (BFM_WM_expert) | Earlier inference-only script of the blended model (argparse, `--gating-reference`); a reference for the test scripts' `summary.json` |
+| data generation | [github.com/yuenongling/WM_data_creation](https://github.com/yuenongling/WM_data_creation) | Creates the HDF5 datasets; the place to regenerate data in another frame (see [9.3](#93-remaining-difference-the-input-sign-frame)) |
+| CharLES BFMv2 | private local git repository | LES solver that deploys the exported models |
+
+The owner's machine-specific locations (local clones, CharLES, the full decision log, the shared venv, the lam-turb
+test set) are listed in `docs/dev_local/LOCAL_PATHS.md`, which is git-ignored and exists only in the owner's working
+copy; the tracked files contain no personal paths (the history was rewritten before the first push to remove them).
 
 ### 1.2 The notebooks
 
@@ -54,24 +58,26 @@ a-posteriori class import, ...) were not ported. To read a notebook as a script:
 
 ### 1.3 Git layout of this repository
 
-- `git clone` of upstream master at `7794771`; remote `origin` renamed to `upstream`. No remote of its own yet and
-  nothing pushed (decision D1). No GitHub fork was created.
-- Branch `master` = upstream; branch `v2` = the refactor, in logical commits:
-
-  | Commit | Content |
-  |---|---|
-  | `47b6768` | Port the fork's changes to the parent package (`src/`, `wall_model_cases.py`, `plot_utils.py`, `train_wm_proposal.py`) |
-  | `e5e2d92` | Training data of the fork (git-lfs), see [section 5](#5-data-provenance) |
-  | `7708c8a` | `src_err/` |
-  | `32e59f8` | Training scripts and TOMLs |
-  | `5a08d21` | Test scripts and TOMLs |
-  | `97e7af9` | CharLES exporters and the a-priori benchmark |
-  | `7e2a19d` | README and requirements |
-  | `2028cfb` | Final-review fixes (single baseline-output helper, consistent model checks, docs); last commit whose TOMLs carry the notebook pointers |
-  | `552c74a` | User docs for fresh users (no notebook references); this file; absolute path of the lam-turb test set |
-
-  Later commits: `git log upstream/master..v2`.
-
+- `git clone` of upstream master at `7794771`; remote `origin` renamed to `upstream`. Published as branch `v2` (the
+  default branch) of the owner's public fork [github.com/imranhayat29/BFM_WM](https://github.com/imranhayat29/BFM_WM)
+  (remote `origin`), next to the fork's own branches `master` and `wip-bfm-error-model`.
+- Branch `v2` = the refactor, in logical commits (`git log --reverse upstream/master..v2`):
+  1. Port the fork's changes to the parent package (`src/`, `wall_model_cases.py`, `plot_utils.py`, `train_wm_proposal.py`)
+  2. Training data of the fork (git-lfs), see [section 5](#5-data-provenance)
+  3. `src_err/`
+  4. Training scripts and TOMLs
+  5. Test scripts and TOMLs
+  6. CharLES exporters and the a-priori benchmark
+  7. README and requirements
+  8. Final-review fixes (single baseline-output helper, consistent model checks, docs): the last commit whose TOMLs
+     carry the notebook pointers, tagged `annotated-tomls` ([section 7](#7-annotated-tomls))
+  9. User docs for fresh users (no notebook references) and this file
+  10. Reproduction of the reference models ([section 12](#12-reproduction-of-the-reference-models-with-v2))
+  11. GPU-node environment (README)
+  12. The all-cases test moved to the root as `test_turb_allcases.py`
+  13. Later commits: the reference models in git-lfs (`models/baseline|sngp|error/`), no personal paths
+- All commits are authored as `Imran Hayat <ihayat@caltech.edu>`; before the first push the history was rewritten once
+  to set that address and once to remove machine-specific paths, so the hashes of a local pre-push clone differ.
 - To follow upstream: `git fetch upstream && git merge upstream/master` on `v2`. Parent files were changed as
   little as possible (D4) so that this stays easy; every change is marked `# BFM_WM_v2:` (see [11.4](#114-conventions)).
 
@@ -85,7 +91,7 @@ a-posteriori class import, ...) were not ported. To read a notebook as a script:
 | `src_err/SNGP.py`, `error_model_functs.py`, `conditional_correction.py`, `select_by_x_wallnormal.py`, `pdf_utils.py`, `plot_err_utils.py`, `error_data_handler.py` | `src_err/sngp.py`, `error_model.py`, `gating.py`, `selection.py`, `plotting.py`, `data.py` | Rewritten, see [3.1](#31-fork-modules-to-v2-modules) |
 | Export scripts `export_sngp_to_npz.py`, `export_sngp_to_cuda_datafiles.py`, `export_error_model_to_npz.py`, `export_error_model_to_cuda_datafiles.py`, `export_baseline_to_cude_datafiles.py`, `convert_to_cuda.py` | `tools/` (`convert_to_cuda.py` at the root) | Copied from the fork's top level; CLIs, defaults and output formats unchanged; file-name typo `cude` fixed. Adaptations (listed in each header): the baseline exporter inserts the repo root into `sys.path` (for `convert_to_cuda` and `src.wall_model`) and creates the output directories; the two TensorFlow readers `setdefault` `TF_USE_LEGACY_KERAS=1` before TensorFlow is imported; example usage updated to `tools/` |
 | Data files | `data/` | See [section 5](#5-data-provenance) |
-| The 7 model artifacts | `models/` (git-ignored) | Byte-identical copies, see [section 6](#6-reference-models) |
+| The 7 model artifacts | `models/baseline/`, `models/sngp/`, `models/error/` (git-lfs) | Byte-identical copies, see [section 6](#6-reference-models) |
 
 Changes made in v2 itself (not in the fork): `RuntimeError` instead of `raise "device is incorrect"` and the optional
 `[general] Seed` in `train_wm_proposal.py`; split indices stored in baseline checkpoints (`src/trainer.py`,
@@ -355,18 +361,20 @@ mean near 955 instead of about 990 (reference 993.39) and an error mean near 2.8
 
 `aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5` (145 MB): full 2D-field extraction of the A-airfoil
 at Re = 2M (wall-normal profiles from leading to trailing edge, x/c in [0, 1.01], `kt_km` column), made with the
-WM_data_creation scripts. It is untracked in the fork and exists only at
-`/path/to/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5`;
-`inputfiles/test/test_lamturb.toml` reads it by that absolute path (`[data.Files]`). Before 2026-10-25 the TOML used
-the relative path `../BFM_WM/data/...` (fork checked out next to v2).
+WM_data_creation scripts. It is untracked in the fork and not distributed; the owner's copy (location in
+`docs/dev_local/LOCAL_PATHS.md`) is linked into `data/` under its key name, which `.gitignore` excludes, and
+`test_lamturb.toml` finds it there by key (no `[data.Files]` entry). Earlier versions of the TOML pointed at it with
+`[data.Files]`, first relative to a sibling clone of the fork, then by an absolute path.
 
 ---
 
 ## 6. Reference models
 
-The 7 artifacts used by the final notebooks, byte-identical copies of `BFM_WM/models/` in
-`<models location>/` (30.9 MB). `models/` is git-ignored, as in upstream
-and the fork (D3). None was trained with seeds, so their splits cannot be reproduced exactly.
+The 7 artifacts used by the final notebooks, byte-identical copies of the fork's `models/` (30.9 MB). They were
+git-ignored at first, as in upstream and the fork (D3); since 2026-10-25 (owner's decision) they are tracked with git-lfs
+in one folder per kind of model, `models/baseline/`, `models/sngp/` and `models/error/` (`models/.gitattributes`; a
+whitelist in `.gitignore` keeps every locally trained model out of git). None was trained with seeds, so their splits
+cannot be reproduced exactly.
 
 | Model | Role | Used by | Recipe / provenance | CharLES |
 |---|---|---|---|---|
@@ -383,7 +391,8 @@ and the fork (D3). None was trained with seeds, so their splits cannot be reprod
 - The SavedModels need Python 3.11 (cloudpickled bytecode) and tf_keras; metadata of the reference SNGPs has only
   the legacy keys (no `bfmwm_v2` block), so their post-hoc groups and display names come from the test TOMLs.
 - Their `assets/` also hold the export bundles (`sngp_params.npz`, `sngp_params_meta.json`, `error_model_params.json`),
-  which `tools/` reproduces (`error_model_params.json` differs only in the recorded `model_dir`).
+  which `tools/` reproduces (`error_model_params.json` differs only in the recorded `model_dir`, which was rewritten to the repo-relative
+  `models/error/<name>` before publishing; nothing reads it).
 - The v2 training TOMLs default to `*_v2` names so that the reference models are never overwritten.
 
 ---
@@ -395,16 +404,17 @@ Before the user docs were cleaned, every TOML carried per-key notebook pointers 
 `EVB thresh_err_change 0.1`, `TURB-NB used ..._ep5000_merged`, `LT-NB cell 78`). They are kept in two places:
 
 - `docs/dev_local/inputfiles_annotated/` (git-ignored, local only; same tree as `inputfiles/`);
-- git history: `git show 2028cfb:inputfiles/<path>`, e.g. `git show 2028cfb:inputfiles/sngp/sngp_turb.toml`.
+- git history, at the tag `annotated-tomls`: `git show annotated-tomls:inputfiles/<path>`, e.g.
+  `git show annotated-tomls:inputfiles/sngp/sngp_turb.toml` (paths as they were then: no folder prefix for the models).
 
-To compare with the current files: `git diff 2028cfb -- inputfiles/`. The important pointers are also in
+To compare with the current files: `git diff annotated-tomls -- inputfiles/`. The important pointers are also in
 [3.2](#32-notebook-flags-to-toml-keys) and [3.3](#33-notebook-values-that-differ-from-the-v2-tomls).
 
 ---
 
 ## 8. Decision record
 
-Full log: `<decision log>` (outside the repository).
+Full log: `BFM_WM_v2_refactor_decisions.md`, outside the repository (location in `docs/dev_local/LOCAL_PATHS.md`).
 Binding blocks: "★ DECISIONS" (2026-10-24), "Late decisions", "Data correction", "Review decisions (2026-10-25)";
 later blocks override earlier ones, and the "Rec." sections below them are history. Summary of the binding state:
 
@@ -414,7 +424,8 @@ later blocks override earlier ones, and the "Rec." sections below them are histo
    inference time, as in CharLES. The truth only selects evaluation points and gives the errors. Checked with the
    no-truth test of [11.3](#113-checks).
 2. **Magnitudes everywhere** (predictions, errors, plots).
-3. **Training data self-contained in `data/`** via git-lfs; models may stay git-ignored (training scripts regenerate them).
+3. **Self-contained**: the training data in `data/` and (since 2026-10-25) the reference models in `models/` are
+   tracked with git-lfs; locally trained models stay out of git.
 4. **Parent functionality preserved**: upstream files changed minimally, each change marked and documented; parent
    tools keep working.
 5. **Changed parent defaults are documented** in the files, `src/README.md` and the README.
@@ -455,7 +466,14 @@ later blocks override earlier ones, and the "Rec." sections below them are histo
 
 **Data** — see [section 5](#5-data-provenance): D2 (git-lfs, `--local`; training data only; test set by path),
 "Data correction" (upstream's gaussian MAPG/FPG; the other 5 replacements stay), review decision (laminar error-model
-data = `down0p005_up1`; laminar SNGP keeps `up0p8`), absolute cluster path for the lam-turb test set.
+data = `down0p005_up1`; laminar SNGP keeps `up0p8`); the lam-turb test set is not distributed and is found in `data/`
+under its key name (a git-ignored local copy or link).
+
+**Publishing and models** (2026-10-25): published as branch `v2` (default branch) of the owner's public fork; commits
+authored as `ihayat@caltech.edu`; the 7 reference models tracked with git-lfs in `models/baseline|sngp|error/`
+(training TOMLs save to the folder of their kind, locally trained models are git-ignored); no machine-specific paths in
+tracked files (they live in the git-ignored `docs/dev_local/LOCAL_PATHS.md`), and the history was rewritten before the
+first push so that no commit contains them; the README is cluster-neutral (venv from `requirements.txt`).
 
 **SNGP**
 - Keep: additional datasets as extra classes; remove/merge by name; `DownsampleBaseline`, `RecomputeNorm` as general
@@ -510,7 +528,7 @@ tf-models-official 2.19.1, pinned in `requirements.txt`.
 | Proposal (log section 1-6) | Final |
 |---|---|
 | D2: data via a `BFM_WM_DATA` env var pointing at the fork | copied into `data/` with git-lfs |
-| D3: track the models in git | git-ignored |
+| D3: track the models in git | git-ignored at first; since 2026-10-25 the 7 reference models are tracked with git-lfs in `models/baseline|sngp|error/` |
 | D6: drop `input2_example.toml` | kept |
 | D7: bundle reference C_f/geometry files in `data/reference/` | not included |
 | S4: scripts `chdir` to the repo root | cwd-relative, run from the root |
@@ -626,7 +644,7 @@ v2-trained (smoke) models; the SNGP bundle has the same keys as the reference on
 - `parent` EQWM law matches `src/baseline_models.log_law_solve` to 6e-14.
 - Smoke models trained before the data correction were stale (turbulent SNGP mean 955, error mean 2.8); regenerated
   13:26 on 2026-10-25.
-- Latent issue fixed in `2028cfb`: training and inference used two helpers for the raw baseline output
+- Latent issue fixed in the final-review commit: training and inference used two helpers for the raw baseline output
   (LogTransform handled only at inference); now one helper, `data.baseline_output`.
 
 The review reports and check scripts lived in a temporary session directory and are not preserved; the results
@@ -638,7 +656,7 @@ above are the part worth keeping.
 
 ### 11.1 Environment on the cluster
 
-- Shared venv: `<path-to-venv>` (8.5 GB). Its `bin/activate` unsets
+- The owner's shared venv `torch-venv` (8.5 GB; location in `docs/dev_local/LOCAL_PATHS.md`). Its `bin/activate` unsets
   `PYTHONPATH`, because the auto-loaded modules put Python 3.10 packages there that shadow the venv's (numpy import
   error). Build any new venv with `env -u PYTHONPATH`.
 - Base interpreter: the shared cluster Python 3.11.6 (`module load <python3.11 module>`), which exists on
@@ -646,8 +664,8 @@ above are the part worth keeping.
   (the GPU nodes have `/usr/bin/python3.9`). The first five GPU jobs therefore failed with `No module named
   numpy/torch`, and the trainings of [section 12](#12-reproduction-of-the-reference-models-with-v2) ran the venv's
   packages with the cluster Python through `PYTHONPATH`. The venv was then re-pointed to the cluster Python with
-  `venv --upgrade --without-pip` (packages and `activate` untouched; the changed files are backed up in
-  `<venv backup>/`). Plain `source .../activate` was then checked
+  `venv --upgrade --without-pip` (packages and `activate` untouched; the changed files are backed up next to the
+  venv, see `docs/dev_local/LOCAL_PATHS.md`). Plain `source .../activate` was then checked
   in a P100 job, and CPU results were bit-identical to those under the old interpreter.
 - If that cluster build ever disappears, re-point the venv to another CPython 3.11 (the compiled packages are cp311):
   `rm <venv>/bin/python3.11 && <python3.11> -m venv --upgrade --without-pip <venv>`.
@@ -659,15 +677,16 @@ above are the part worth keeping.
 
 | Path | Content |
 |---|---|
-| `models/<ModelName>/` | trained SavedModels + `assets/` |
-| `models/checkpoints/<ModelName>/ckpt_XXXX/` | error-model snapshots |
+| `models/sngp/<ModelName>/`, `models/error/<ModelName>/` | trained SavedModels + `assets/` |
+| `models/error/checkpoints/<ModelName>/ckpt_XXXX/` | error-model snapshots |
+| `models/baseline/<run>/` | baseline checkpoints of `train_wm_proposal.py` |
 | `results/training/<ModelName>/` | confusion matrices, class counts, histories |
 | `results/smoke/{models,training}/` | `--smoke` outputs (Overwrite allowed) |
 | `results/test_turb_gaussian_2M/`, `results/test_lamturb/` | test outputs |
 | `results/test_turb_allcases/` | all-cases test |
 | `results/export/` | exporter outputs |
 
-`models/` and `results/` are git-ignored.
+`results/` is git-ignored; in `models/` only the 7 reference models are tracked (git-lfs), everything trained locally is ignored.
 
 ### 11.3 Checks
 
@@ -757,9 +776,9 @@ sys.exit(1 if bad else 0)
 
 ### 12.1 Trainings
 
-The default training TOMLs at `2028cfb`, trained on P100 GPUs (normal QOS) on 2026-10-25 with the cluster job recipe
+The default training TOMLs as of the final-review commit (`annotated-tomls`), trained on P100 GPUs (normal QOS) on 2026-10-25 with the cluster job recipe
 of the README. The `[turb]` branch of `error_lamturb.toml` has the same recipe and seed as `error_turb.toml` and was not
-trained separately. Outputs: `models/*_v2` on the cluster (git-ignored).
+trained separately. Outputs: `*_v2` models in the owner's working copy (git-ignored; `models/sngp/` and `models/error/`).
 
 | v2 model | Recipe | Time | Result (reference in parentheses) |
 |---|---|---|---|

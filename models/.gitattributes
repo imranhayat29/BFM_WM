@@ -1,0 +1,8 @@
+# Model files are stored with git-lfs (reference models; see the README, "Reference models")
+*.pth filter=lfs diff=lfs merge=lfs -text
+*.pb filter=lfs diff=lfs merge=lfs -text
+*.npz filter=lfs diff=lfs merge=lfs -text
+*.json filter=lfs diff=lfs merge=lfs -text
+*.csv filter=lfs diff=lfs merge=lfs -text
+*.index filter=lfs diff=lfs merge=lfs -text
+variables.data-* filter=lfs diff=lfs merge=lfs -text

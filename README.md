@@ -55,7 +55,7 @@ src_err/                 error model, SNGP, blended correction, data, metrics, p
 tools/                   CharLES export scripts (see tools/README.md)
 wall_model_cases.py      dataset registry (upstream + additional keys)
 data/                    HDF5 datasets (git-lfs)
-models/                  trained models (git-ignored, see Reference models)
+models/                  reference models (git-lfs): baseline/, sngp/, error/ (see Reference models)
 docs/DEVELOPMENT.md      developer notes (see Development notes)
 ```
 
@@ -79,27 +79,27 @@ docs/DEVELOPMENT.md      developer notes (see Development notes)
 
 ## Setup
 
-- Python **3.11** is required: the saved error models contain cloudpickled Python 3.11 bytecode, and the
-  TensorFlow stack is pinned for legacy-Keras SavedModels.
+- **Python 3.11** is required: the saved error models contain cloudpickled Python 3.11 bytecode, and the
+  TensorFlow stack is pinned for legacy-Keras SavedModels. Create a virtual environment and install the pinned
+  packages of `requirements.txt` (PyTorch, TensorFlow with tf_keras, TensorFlow Probability and tf-models-official,
+  and the scientific Python stack):
   ```bash
-  python3.11 -m venv .venv && source .venv/bin/activate
+  python3.11 -m venv .venv
+  source .venv/bin/activate
+  pip install --upgrade pip
   pip install -r requirements.txt
   ```
-  A venv only links to its base interpreter. To run batch jobs, build it from a Python 3.11 that also
-  exists on the compute nodes (e.g. one loaded with `module load`).
-- On the cluster, the environment already exists: `source <path-to-venv>/bin/activate`,
-  on the login nodes and in GPU jobs. Its base interpreter is the shared cluster Python 3.11.6
-  (`module load <python3.11 module>`), which exists on every node.
-  For a venv of your own on the cluster, run `unset PYTHONPATH` before creating, filling (`pip install`) and
-  activating it: the auto-loaded modules put Python 3.10 packages on `PYTHONPATH`, which shadow the venv's.
-  The shared torch-venv's `activate` already does this.
+- **On a cluster**, build the venv from a Python 3.11 that also exists on the compute nodes (e.g. one provided
+  by an environment module): a venv only links to its base interpreter, so batch jobs fail at the first import
+  if that interpreter is missing on the node. If environment modules put other Python packages on `PYTHONPATH`,
+  run `unset PYTHONPATH` before creating, filling and activating the venv; those packages would shadow the
+  venv's.
+- **Data and reference models** are stored with git-lfs (about 1.1 GB): `git lfs install --local && git lfs pull`.
 - Run all scripts from the repository root. Paths are relative to it: `./inputfiles`, `./models`, `./data`,
   `./results`.
 - `TF_USE_LEGACY_KERAS=1` is set automatically by `src_err` before TensorFlow is imported.
 - On a shared login node, limit the threads, because torch and TensorFlow otherwise see every core:
   `export OMP_NUM_THREADS=2 TF_NUM_INTRAOP_THREADS=2 TF_NUM_INTEROP_THREADS=1`.
-- The data are stored with git-lfs: `git lfs install --local && git lfs pull`.
-- Copy the reference models into `models/` (see [Reference models](#reference-models-models-not-in-git)).
 
 ## Data
 
@@ -116,12 +116,11 @@ Data are stored in `data/` directories. They cover data summarized in [Table](ht
 
 - **Dataset lookup.** The TOMLs name datasets by key. A key is resolved to a file in this order: an explicit
   path in the TOML's `[data.Files]` table, `./data/<key>_data.h5`, then the entry in `wall_model_cases.py`.
-- **Lam-turb test set.** `aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5` is **not
-  included** in this repository. It is a full 2D-field extraction of the A-airfoil at Re = 2M, with the
-  `kt_km` column. On the cluster it is at
-  `/path/to/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5`,
-  and `test/test_lamturb.toml` reads it from there through `[data.Files]`. Elsewhere, edit that entry, or
-  place the file in `data/` and remove the entry (the registry key points to `./data/`).
+- **Lam-turb test set.** `aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5`, the default test
+  set of `test_lamturb.py`, is **not included** in this repository (contact the maintainers to obtain it). It is
+  a full 2D-field extraction of the A-airfoil at Re = 2M, with the `kt_km` column. Place the file, or a link to
+  it, in `data/` under that name (it is git-ignored there), or give its path in the `[data.Files]` table of the
+  test TOML.
 - `wall_model_cases.py` also registers keys whose files are not included (the comment at the top of the file
   lists them). Place such files in `data/` or give their paths in `[data.Files]` to use them.
 
@@ -139,7 +138,8 @@ python train_wm_proposal.py input2_example.toml            # commented example c
 - `input2_example.toml` is a commented baseline config in upstream's format (a multi-dataset InputScaling-2
   network). It logs to Weights & Biases (`UseWandb = true`); set it to `false` to run without.
 - `baseline_turb.toml` and `baseline_lam.toml` are the exact configurations embedded in the two reference
-  checkpoints. Only `GpuNum`, `UseWandb` and `Seed` (an optional key added by this repository) differ.
+  checkpoints. Only `GpuNum`, `UseWandb`, `SaveDir` (`./models/baseline`) and `Seed` (an optional key added by
+  this repository) differ.
 - New checkpoints store their train/valid split indices. The SNGP and error-model training reuses them, so
   both see the baseline's actual train/valid split. Checkpoints without stored indices (such as the two
   reference baselines) get a re-split seeded by the training TOML's `Seed`.
@@ -164,7 +164,7 @@ python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --
   shared when their `[data]` settings and `Seed` agree.
 - In the laminar-turbulent variant each branch is trained on its own data with its own baseline; $k_t/k_m$
   is not used in training. The switch between the branches is applied at test time (and in CharLES).
-- Models are saved to `<SaveDir>/<ModelName>` (default `./models`). An explicit `ModelName` is required, and
+- Models are saved to `<SaveDir>/<ModelName>` (default `./models/sngp` or `./models/error`). An explicit `ModelName` is required, and
   existing models are only replaced with `Overwrite = true`.
 - Each model directory contains the SavedModel and `assets/`:
   - SNGP: `metadata.json` (the keys read by the CharLES exporters, plus a `bfmwm_v2` block with the
@@ -303,22 +303,18 @@ selects them, `Formats` sets the formats):
 
 ### Running on a GPU node (Slurm)
 
-The scripts use one GPU (`--gpu 0` inside a job). The venv's base interpreter must exist on the compute
-node. If it does not, `source <venv>/bin/activate && python ...` silently runs another Python, and the job
-fails at the first import (`ModuleNotFoundError: No module named 'numpy'`).
-
-On the cluster, `/usr/bin/python3.11` exists on the login nodes only (the GPU nodes have `/usr/bin/python3.9`), so a
-venv built on it works only there. The shared torch-venv is built on the cluster Python 3.11.6, which every node has;
-activating it in a job works (checked on a P100 node), and the training and test scripts ran on P100 nodes
-with this interpreter and these packages. Example job script, submitted from the repository root with `sbatch job.sh`:
+The scripts use one GPU (`--gpu 0` inside a job). Example job script, submitted from the repository root with
+`sbatch job.sh` (adapt the account, partition and resources to your cluster):
 ```bash
 #!/bin/bash
 #SBATCH -A <account> -p <gpu-partition> --gres=gpu:1 -c 8 --mem=48G -t 08:00:00
-# activate also unsets the PYTHONPATH of the auto-loaded modules, whose Python 3.10 packages would shadow the venv's
 source <path-to-venv>/bin/activate
 export OMP_NUM_THREADS=8 TF_NUM_INTRAOP_THREADS=8 TF_NUM_INTEROP_THREADS=2
 python train_turb.py --sngp sngp/sngp_turb.toml --gpu 0
 ```
+If the job fails at the first import (`ModuleNotFoundError: No module named 'numpy'`), the venv's base interpreter
+does not exist on the compute node: `source <venv>/bin/activate` then silently runs another Python (see
+[Setup](#setup)).
 
 ## The blended prediction
 
@@ -387,8 +383,8 @@ shared top-level `[general]` table are inherited by the branches that do not set
 
 | Section | Main keys (default) |
 |---|---|
-| `[general]` | `ModelName` (required), `SaveDir` (`"./models"`), `Save` (`true`), `Overwrite` (`false`), `GpuNum` (`0`; `-1` = CPU), `Seed` (required) |
-| `[baseline]` | `Checkpoint` (required): baseline `.pth` in `./models` or a path. Its embedded config defines the baseline training data (the first SNGP classes) and the input scaling. |
+| `[general]` | `ModelName` (required), `SaveDir` (`"./models/sngp"` / `"./models/error"`), `Save` (`true`), `Overwrite` (`false`), `GpuNum` (`0`; `-1` = CPU), `Seed` (required) |
+| `[baseline]` | `Checkpoint` (required): baseline `.pth`, as a path relative to `./models` (e.g. `baseline/<file>.pth`) or any path. Its embedded config defines the baseline training data (the first SNGP classes) and the input scaling. |
 | `[data]` | `AddDatasets` (`[]`): additional datasets, split 80/20 by `TrainRatio` (`0.8`); `upy` (`0.15`) and `downy` (`0.0`): n1/δ window of the additional data (`upy` ≥ 1: no upper cut); `Files` (`{}`): explicit file paths |
 | `[data]`, SNGP only | `DownsampleBaseline` (`1`): keep every N-th baseline point; `RecomputeNorm` (`false`): z-score statistics over the (strided) baseline + additional training data instead of the full baseline training data |
 | `[classes]`, SNGP only | `NumClasses` (`50`): GP output units (CharLES expects 50 turbulent, 30 laminar); `RemoveClasses`, `[classes.MergeGroups]`, `[classes.DisplayNames]`, `[classes.PosthocGroups]`, all by class **name** |
@@ -411,7 +407,7 @@ turbulent-only / lam-turb.
 | Section | Main keys (default) |
 |---|---|
 | `[general]` | `OutputDir` (`results/test_turb_gaussian_2M` / `results/test_lamturb`), `Formats` (`["png", "pdf"]`), `GpuNum` (`0`), `SaveArrays` (`false`) |
-| `[models]` | `Baseline`, `Sngp`, `Error`: name in `./models` or a path (default: the reference models of the branch) |
+| `[models]` | `Baseline`, `Sngp`, `Error`: path relative to `./models` (e.g. `sngp/<name>`) or any path (default: the reference models of the branch) |
 | `[classes]` | `PosthocGroups`, `DisplayNames` (default: those stored in the SNGP metadata) |
 | `[data]` | `Datasets`, `upy` (`0.15` / `1.0`), `downy` (`0.0`), `Stride` (`2`: every 2nd point), `MaxSamples` (`0` = all), `Files` |
 | `[eqwm]` | `Law`: `"charles"` (default, CharLES BFMv2 two-layer law) or `"parent"` (upstream's `src/baseline_models.log_law_solve`: log law, re-solved with a cubic near-wall layer below $y^+ = 23$) |
@@ -423,23 +419,22 @@ turbulent-only / lam-turb.
 
 The gate entries are inline tables, e.g. `Confidence = { Threshold = 0.7, Delta = 0.05 }`.
 
-## Reference models (`models/`, not in git)
+## Reference models (`models/`, git-lfs)
 
-`models/` is git-ignored, as upstream. On the cluster the reference models are in
-`<models location>/`; copy them into a clone with
-```bash
-mkdir -p models && cp -r <models location>/. models/
-```
+The pretrained reference models are stored with git-lfs in `models/`, in one folder per kind of model:
+`baseline/` (PyTorch checkpoints), `sngp/` and `error/` (TensorFlow SavedModels). `git lfs pull` fetches them
+together with the data. The TOMLs refer to a model by its path relative to `./models` (e.g. `sngp/<name>`) or by
+any other path.
 
-| Model | Role | Used by default in | In CharLES BFMv2 |
+| Model (in `models/`) | Role | Used by default in | In CharLES BFMv2 |
 |---|---|---|---|
-| `cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth` | turbulent baseline (both variants) | all training TOMLs (turbulent), all three test TOMLs | yes |
-| `NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth` | laminar baseline | lam-turb training TOMLs (`[lam]`), `test_lamturb.toml` | yes |
-| `sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged` | turbulent SNGP (4000 epochs) | all three test TOMLs | yes |
-| `sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged` | alternative turbulent SNGP (5000 epochs) | none | no |
-| `sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged` | laminar SNGP | `test_lamturb.toml` | yes |
-| `error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811` | turbulent error model (both variants) | all three test TOMLs | yes |
-| `error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000` | laminar error model | `test_lamturb.toml` | yes |
+| `baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth` | turbulent baseline (both variants) | all training TOMLs (turbulent), all three test TOMLs | yes |
+| `baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth` | laminar baseline | lam-turb training TOMLs (`[lam]`), `test_lamturb.toml` | yes |
+| `sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged` | turbulent SNGP (4000 epochs) | all three test TOMLs | yes |
+| `sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged` | alternative turbulent SNGP (5000 epochs) | none | no |
+| `sngp/sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged` | laminar SNGP | `test_lamturb.toml` | yes |
+| `error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811` | turbulent error model (both variants) | all three test TOMLs | yes |
+| `error/error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000` | laminar error model | `test_lamturb.toml` | yes |
 
 - The training TOMLs are the recipes of these models: `sngp_turb.toml` (5000 epochs) of the ep5000 SNGP,
   the `[turb]` branch of `sngp_lamturb.toml` (4000 epochs) of the ep4000 SNGP, `error_turb.toml` and the
@@ -450,9 +445,13 @@ mkdir -p models && cp -r <models location>/. models/
 - The laminar error model was trained on the laminar A-airfoil files up to n1/δ = 1 (`down0p005_up1`, the
   "UPY1" in its name), which `error/error_lamturb.toml` uses. The laminar SNGP was trained on the narrower
   `down0p02_up0p8` files (`sngp/sngp_lamturb.toml`).
-- The training TOMLs default to new names (`*_v2`) so that the reference models are never overwritten. On the cluster
-  the folder above also holds the models trained with the default training TOMLs (`*_v2`); they perform like the
-  reference models (comparison in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), section 12).
+- New models are saved next to the reference models of their kind: `train_turb.py`/`train_lamturb.py` to
+  `models/sngp/<ModelName>` and `models/error/<ModelName>` (error-model snapshots in `models/error/checkpoints/`),
+  and `train_wm_proposal.py` to a subfolder per run in `models/baseline/`. Models trained locally are git-ignored;
+  only the reference models are tracked.
+- The training TOMLs default to new names (`*_v2`) so that the reference models are never overwritten. Models
+  trained with them perform like the reference models (comparison in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md),
+  section 12).
 
 ## Baseline testing tools (upstream)
 
@@ -460,7 +459,7 @@ mkdir -p models && cp -r <models location>/. models/
 
 ```bash
 # Load model and test on selected datasets
-python test_model.py --model_path model_name.pth
+python test_model.py --model_path baseline/<checkpoint>.pth   # path relative to ./models
 ```
 When prompted, enter a dataset name or 'P' to print available datasets.
 
@@ -468,7 +467,7 @@ When prompted, enter a dataset name or 'P' to print available datasets.
 
 ```bash
 # Test model and generate HTML report
-python test_model_summary_table.py model_name.pth
+python test_model_summary_table.py baseline/<checkpoint>.pth   # path relative to ./models
 ```
 
 This generates:
@@ -487,7 +486,8 @@ This generates:
 | `wall_model_cases.py` | Additional dataset keys (A-airfoil full 2D fields and their laminar sets, NASA hump regions, a-posteriori LES sets, ...). Keys whose files are not included are listed at the top of the file. |
 | `plot_utils.py` | No longer loads a personal matplotlib style file. |
 | `requirements.txt` | New: the pinned Python 3.11 environment. |
-| `.gitignore` | `inputfiles/` is tracked; `docs/dev_local/` (local developer files) is ignored. |
+| `.gitignore` | `inputfiles/` and the reference models in `models/` are tracked; models trained locally, `docs/dev_local/` (local developer files) and a local copy of the lam-turb test set are ignored. |
+| `models/` | Reference models tracked with git-lfs (`models/.gitattributes`), in `baseline/`, `sngp/` and `error/`; upstream keeps `models/` out of git. |
 | `data/` | See [Data](#data). |
 | `README.md` | `test_model.py` takes `--model_path` (the old usage line was out of date). |
 

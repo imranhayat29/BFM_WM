@@ -130,7 +130,7 @@ def load_baseline_model(checkpoint: str, device: Any):
     Load a baseline WallModel checkpoint
 
     Args:
-        checkpoint: File name in ./models or a path
+        checkpoint: Path relative to ./models (e.g. baseline/<file>.pth) or any path
         device: torch.device or string; map_location also handles checkpoints saved on cuda:1
 
     Returns:
@@ -237,7 +237,7 @@ def baseline_training_split(model, checkpoint_path: str, seed: int) -> BaselineS
 
     Args:
         model: WallModel from load_baseline_model
-        checkpoint_path: Checkpoint file (name in ./models or path), read for stored indices
+        checkpoint_path: Checkpoint file (path relative to ./models or any path), read for stored indices
         seed: Seed of the parent split
 
     Returns:

@@ -283,10 +283,10 @@ def resolve_input_file(arg: str, subdir: Optional[str] = None) -> str:
 
 def resolve_model_path(name_or_path: str, directory: bool = False) -> str:
     """
-    Resolve a model name under ./models, falling back to the given path
+    Resolve a model path relative to ./models (e.g. sngp/<name>), falling back to the given path
 
     Args:
-        name_or_path: Model file/directory name in ./models, or a path
+        name_or_path: Model file/directory relative to ./models, or any path
         directory: Only a directory under ./models matches (SavedModels); a file of that name
                    is ignored
 
@@ -358,7 +358,7 @@ def snapshot_dir(cfg: Mapping[str, Any]) -> str:
         <SaveDir>/checkpoints/<ModelName>
     """
     general = cfg.get("general", {})
-    return os.path.join(general.get("SaveDir", "./models"), "checkpoints", general["ModelName"])
+    return os.path.join(general.get("SaveDir", "./models/error"), "checkpoints", general["ModelName"])
 
 
 def make_output_dir(path: str) -> str:

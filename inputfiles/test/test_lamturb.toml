@@ -6,7 +6,7 @@
 # tau_w = mu |u1|/y1 (no dp/ds) on laminar points, for both the confidence and the near-wall switch.
 # Run from the repository root:
 #   python test_lamturb.py test/test_lamturb.toml [--gpu N] [--output-dir DIR] [--max-samples N]
-# Every key is optional; the values below are the defaults, except [data.Files] (see there) and
+# Every key is optional; the values below are the defaults, except
 # [turb.classes]/[lam.classes]: an omitted PosthocGroups or DisplayNames is taken from the SNGP metadata,
 # which is empty for the reference models (so removing them from [turb.classes] loses the groups and names shown
 # there; the empty [lam.classes] values give the same result as omitting them).
@@ -22,10 +22,10 @@ KtKmThreshold = 0.002   # A point is laminar iff kt_km <= threshold (CharLES KT_
                         # column 'kt_km', else inferred from the flow name ('laminar'/'fs_' -> 0, 'transition' -> 0.5, else 1)
 
 [turb.models]
-# Turbulent branch (names under ./models/ or paths): the reference turbulent models that CharLES BFMv2 runs
-Baseline = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
-Sngp     = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
-Error    = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+# Turbulent branch (paths relative to ./models/ or any path): the reference turbulent models that CharLES BFMv2 runs
+Baseline = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Sngp     = "sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
+Error    = "error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
 
 [turb.classes]
 # Post-hoc grouping (labels and plots only; the confidence always uses the un-merged SNGP classes) and
@@ -35,9 +35,9 @@ DisplayNames  = { CH = "ZPG TBL", FS_ZPG = "Viscous ZPG", FS_APG = "Viscous APG"
 
 [lam.models]
 # Laminar branch: the reference laminar models
-Baseline = "NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
-Sngp     = "sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged"
-Error    = "error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000"
+Baseline = "baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
+Sngp     = "sngp/sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged"
+Error    = "error/error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000"
 
 [lam.classes]
 PosthocGroups = {}   # No post-hoc grouping on the laminar side (classes: Laminar ZPG/APG/FPG)
@@ -46,7 +46,8 @@ DisplayNames  = {}   # Identity
 [data]
 # Test dataset: the full 2D-field extraction of the A-airfoil 2M case (wall-normal profiles from the leading edge
 # to the trailing edge, x/c in [0, 1.01], with the kt_km column). It is NOT included in the repository (./data/
-# holds training data only); [data.Files] below gives its location.
+# holds training data only): place the file (or a link to it) in ./data/ under its key name, or give its path
+# in [data.Files].
 Datasets   = ["aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall"]
 upy        = 1.0     # Keep n1/delta <= upy (>= 1: no upper cut, i.e. the full profiles)
 downy      = 0.0     # Keep n1/delta >= downy (0: no lower cut; honoured even when upy >= 1)
@@ -54,10 +55,9 @@ Stride     = 2       # Keep every Stride-th point of each dataset (1 = all point
 MaxSamples = 0       # > 0: deterministic evenly spaced subsample of all points (smoke tests); --max-samples overrides
 
 [data.Files]
-# Explicit h5 path per dataset key (absolute, or relative to the repository root, where the scripts run).
-# The lam-turb test set is not included in the repository; the path below is its location on the cluster.
-# Elsewhere, edit the path, or place the file in ./data/ and remove the entry.
-aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall = "/path/to/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5"
+# Optional explicit h5 path per dataset key (absolute, or relative to the repository root, where the scripts run),
+# for files that are not in ./data/, e.g.
+# aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall = "/path/to/aairfoil_2M_full2Dfield_down0_up1_cfgauss_w30_tr3_xalltoall.h5"
 
 [eqwm]
 Law = "charles"      # EQWM (turbulent fallback and comparison): "charles" (CharLES BFMv2 two-layer law) or "parent" (upstream's log_law_solve)

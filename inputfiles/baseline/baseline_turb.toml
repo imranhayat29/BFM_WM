@@ -1,5 +1,5 @@
 # Baseline BFM wall model, turbulent (used by both the turbulent-only and the laminar-turbulent workflows).
-# This is the configuration embedded in the reference checkpoint models/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth
+# This is the configuration embedded in the reference checkpoint models/baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth
 # (n1/delta window [0.0025, 0.15], as in its name); its training data include the laminar Falkner-Skan sets FS_*.
 # Train with:  python train_wm_proposal.py baseline/baseline_turb.toml
 
@@ -8,7 +8,7 @@
 Verbose = 1             # Verbosity level (0: quiet, 1: informational, 2: debug)
 UseWandb = false       # Whether to use Weights & Biases for experiment tracking (the reference checkpoint used true)
 Save = true             # Whether to save trained models
-SaveDir = "./models"    # Directory to save models
+SaveDir = "./models/baseline"    # Directory to save models (in a subfolder per run)
 GpuNum = 0              # GPU index (train_wm_proposal.py needs a CUDA GPU; -1/CPU is not supported)
 Seed = 1234             # Seeds the train/valid split and the weights (the reference checkpoint was trained unseeded)
 # WandbName = "Test_inner_att2_nw2000" # Name for the Weights & Biases run

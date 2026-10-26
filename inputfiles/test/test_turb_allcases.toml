@@ -18,10 +18,10 @@ Formats   = ["pdf", "png"]                   # Figure formats (png, pdf, svg, jp
 GpuNum    = 0                                # GPU index for torch and TensorFlow (-1 = CPU); --gpu overrides
 
 [models]
-# Names under ./models/ (or paths). Same reference models as test_turb.toml (the turbulent set CharLES BFMv2 runs).
-Baseline = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
-Sngp     = "sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
-Error    = "error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+# Paths relative to ./models/ (baseline/, sngp/, error/) or any path. Same reference models as test_turb.toml (the turbulent set CharLES BFMv2 runs).
+Baseline = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Sngp     = "sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
+Error    = "error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
 
 [data]
 # Evaluated dataset keys (wall_model_cases.py registry, ./data/<key>_data.h5, or [data.Files]); one case each,

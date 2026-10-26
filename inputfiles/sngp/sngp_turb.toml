@@ -15,7 +15,7 @@
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged   (this recipe, 4000 epochs; the turbulent SNGP
 #                                                                       deployed in CharLES BFMv2 and used by the test scripts)
 ModelName = "sngp_model_turb_v2"
-SaveDir   = "./models"   # directory receiving <ModelName>/ (SavedModel + assets/metadata.json, history.json, split_indices.npz)
+SaveDir   = "./models/sngp"   # directory receiving <ModelName>/ (SavedModel + assets/metadata.json, history.json, split_indices.npz)
 Save      = true         # false: train and write diagnostics only
 Overwrite = false        # true: replace an existing <SaveDir>/<ModelName> (otherwise the script stops before training)
 GpuNum    = 0            # GPU index for TensorFlow and torch; -1 = CPU (the CLI option --gpu overrides it)
@@ -23,11 +23,11 @@ Seed      = 1234         # seeds the baseline train/valid split (if the checkpoi
                          # additional datasets, weight initialisation, shuffling and dropout (required)
 
 [baseline]
-# Baseline wall-model checkpoint (file in ./models or a path; required). Its embedded config defines the baseline
+# Baseline wall-model checkpoint (path relative to ./models, e.g. baseline/<file>.pth, or any path; required). Its embedded config defines the baseline
 # training datasets (= the first SNGP classes, in checkpoint order) and the input scaling.
 # The SNGP/error model see the baseline's own train/valid split: the indices stored in checkpoints trained with
 # this repository, otherwise (e.g. the reference checkpoints) the random split re-drawn with Seed.
-Checkpoint = "cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
+Checkpoint = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 
 [data]
 # Additional datasets (registry keys of wall_model_cases.py / ./data/<key>_data.h5), appended as extra classes

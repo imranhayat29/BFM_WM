@@ -136,6 +136,7 @@ Cell references found in the code (all 0-based):
 | LT-NB c78 | smoothed tripcolor maps | `plotting.py` tripcolor, `[plots.tripcolor]` |
 | EVB c6, c7, c10, c26 | thresholds (`ERROR_THRESHOLD_PERCENT`, `Retau_thresh`, `thresh_err_change`), SNGP path, `RENAME_MAPPING`, `CASE_MARKER_MAP`/`_RULES` | benchmark `[evaluation]`, `[models]`, `[display_names]`, `plotting.py` markers |
 | AIAA c48 | `plot_error_pdf_no_filter_vs_filter` | benchmark figure `pdf_always_vs_blended` |
+| older fork notebooks: `BFMWM_ErrorModel copy_gaussian2M.ipynb` c17, `BFMWM_ErrorModel copy.ipynb` c65-c67; fork `src_err/plot_err_utils.py` | "the notebooks' u1-up / u1-u2 scatters": inputs and errors over (u1 n1/ν, up n1/ν) and (u1 n1/ν, u2 n1/ν), linear axes (−5000…20000, −200…200), `jet`, marker size 1 (TURB-NB and LT-NB have none) | `plotting.plot_input_space`; `[plots.input_space]` of the all-cases and training TOMLs (notebook limits = `LinearLimits` default) |
 
 ---
 
@@ -558,6 +559,18 @@ always-corrected in one pass; joint 10000 % outlier cut; error-change filter off
 or `"piout"` (|π_out,true| >= 2); `cases.csv`, `overall.json`, `points.npz`; three overall averages (unweighted over
 cases, point-weighted, per role); `[groups]`; y-label option; `--replot` without torch/TF.
 
+**Input-space figures** (2026-11-04): predictions over the planes π1-π2 and π1-π3 in `test_turb_allcases.py`
+(`<OutputDir>/input_space/`, sets train/test = `TrainingDatasets` / the rest) and after every SNGP/error-model training
+(`results/training/<ModelName>/input_space/`, sets train/valid = the model's own splits; no test datasets are
+loaded in training). One shared function (`plotting.plot_input_space` / `plot_input_space_sets`), one figure per set,
+metric and scale with both planes side by side. User choices: `Scale` symlog | linear | both (default symlog;
+linear limits default to the notebooks'); viridis (as the v2 maps, not the old notebooks' jet); σ, σ%, |μ|, |μ|%
+as magnitudes on log colour scales (percentages relative to |π_out,baseline| with the LowValue blend, as the test
+maps); class = post-hoc groups with C below the confidence threshold drawn as OOD (training: `OodThreshold` 0.7);
+`TrainingBackground` default false; seeded random draw order; all branches (lam-turb training included;
+`test_lamturb.py` unchanged); `--plots-only` for already trained models (split checked against `split_indices.npz`).
+The benchmark TOML gained an optional `[classes]` table (default: SNGP metadata) for the class figures.
+
 **Exports** (D8): exporters copied to `tools/` with unchanged CLIs, defaults and formats; saved-model formats kept
 (SNGP variable names, 1024 features, metadata keys `num_classes`, `num_classes_train`, `mean_X_train`, `std_X_train`;
 `error_norm_stats.json` with scalar `y_mean`/`y_std`; plain Dense stack); outputs to `results/export/` (not into model
@@ -728,10 +741,10 @@ Cluster-specific details (module names, interpreter paths, Slurm account and par
 | `models/sngp/<ModelName>/`, `models/error/<ModelName>/` | trained SavedModels + `assets/` |
 | `models/error/checkpoints/<ModelName>/ckpt_XXXX/` | error-model snapshots |
 | `models/baseline/<run>/` | baseline checkpoints of `train_wm_proposal.py` |
-| `results/training/<ModelName>/` | confusion matrices, class counts, histories |
+| `results/training/<ModelName>/` | confusion matrices, class counts, histories; `input_space/` figures |
 | `results/smoke/{models,training}/` | `--smoke` outputs (Overwrite allowed) |
 | `results/test_turb_gaussian_2M/`, `results/test_lamturb/` | test outputs |
-| `results/test_turb_allcases/` | all-cases test |
+| `results/test_turb_allcases/` | all-cases test (input-space figures in `input_space/`) |
 | `results/export/` | exporter outputs |
 
 `results/` is git-ignored; in `models/` only the 7 reference models are tracked (git-lfs), everything trained locally is ignored.
@@ -748,6 +761,8 @@ python test_turb_allcases.py test/test_turb_allcases.toml --dry-run
 # training smoke tests (2 epochs, capped samples, results/smoke/)
 python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --gpu -1 --smoke
 python train_lamturb.py --sngp sngp/sngp_lamturb.toml --error error/error_lamturb.toml --gpu -1 --smoke
+# input-space figures of the smoke models without training (must equal those written by the smoke training)
+python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --gpu -1 --smoke --plots-only
 # test scripts on a subsample
 python test_turb.py test/test_turb.toml --gpu -1 --max-samples 2000 --output-dir results/smoke/test_turb
 python test_lamturb.py test/test_lamturb.toml --gpu -1 --max-samples 2000 --output-dir results/smoke/test_lamturb

@@ -82,8 +82,8 @@ transition_JHU_transition = "Transition BL"
 Separation = "Separation"
 
 [classes.PosthocGroups]
-# Post-hoc groups of trained classes, used for labels/plots at test time only (the confidence always uses the
-# un-merged classes); stored in the metadata.
+# Post-hoc groups of trained classes, used for labels/plots only (test scripts and the class figures of
+# [plots.input_space]; the confidence always uses the un-merged classes); stored in the metadata.
 "APG TBL" = ["APG", "Curved BL APG"]
 "FPG TBL" = ["FPG", "NASA Hump FPG", "Curved BL FPG"]
 "Separation" = ["SEP", "NASA Hump SEP"]
@@ -108,3 +108,20 @@ EndLearningRate = 1.0e-4     # ... down to this value
 DecayUnit       = "epoch"    # "epoch": decay over all Epochs (default); "step": decay_steps = Epochs optimiser
                              # steps, i.e. the floor is reached early (reproduces the reference models)
 ClassWeights    = "balanced" # "balanced": sklearn inverse-frequency class weights (reference models); "none"
+
+[plots.input_space]
+# Diagnostics: the SNGP's confidence and predicted class over the network-input planes pi_1-pi_2 and pi_1-pi_3
+# (pi_1 = u1 n1/nu, pi_2 = up n1/nu, pi_3 = u2 n1/nu) of its train and validation splits, one figure per split,
+# metric and axis scale with both planes side by side: results/training/<ModelName>/input_space/
+# <train|valid>_<metric>_<symlog|linear>.png. Written after training, or for a saved model with --plots-only.
+Sets    = "both"                 # "train", "valid", "both" or "none"
+Metrics = ["confidence", "class"]   # confidence C; class: predicted class after [classes.PosthocGroups], with display names
+OodThreshold       = 0.7         # class figures: points with C below this are drawn as "OOD" (0 = off)
+TrainingBackground = false       # true: draw the training split in black behind the validation split
+BackgroundAlpha    = 0.1         # opacity of the background points
+Scale     = "symlog"             # axes: "symlog" (logarithmic in |pi|, linear within +-LinThresh), "linear" or "both"
+LinThresh = 1.0                  # linear range of the symlog axes
+LinearLimits = { Pi1 = [-5000.0, 20000.0], Pi2 = [-200.0, 200.0], Pi3 = [-5000.0, 20000.0] }   # linear axis limits
+SymlogLimits = { Pi1 = [], Pi2 = [], Pi3 = [] }   # symlog axis limits ([] = data range)
+MarkerSize      = 1.0            # scatter marker size
+ConfidenceRange = [0.0, 1.0]     # colour range of C

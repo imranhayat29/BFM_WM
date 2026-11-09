@@ -14,11 +14,14 @@ hard switch between the branches is applied at test time (test_lamturb.py) and i
 
 Usage (from the repository root):
     python train_lamturb.py --sngp sngp/sngp_lamturb.toml --error error/error_lamturb.toml \\
-        [--branch lam|turb|both] [--gpu N] [--smoke]
+        [--branch lam|turb|both] [--gpu N] [--smoke] [--plots-only]
 
     --branch   branch(es) to train (default both; a branch missing from a TOML is skipped for that model)
     --gpu N    GPU index for torch and TensorFlow (overrides [general] GpuNum; -1 = CPU)
     --smoke    login-node smoke test (2 epochs, capped samples, ./results/smoke/)
+    --plots-only  train nothing: write the input-space figures of the saved models (see train_turb.py)
+
+Diagnostics of each model, including the input-space figures, go to results/training/<ModelName>/.
 """
 # Provenance: replaces the training cells of LT-NB (cells 14-42), which had to be run once per branch by
 # hand; see docs/DEVELOPMENT.md.
@@ -53,7 +56,7 @@ def main(argv=None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
-    if not args.smoke:
+    if not args.smoke and not args.plots_only:
         from src_err.training import check_outputs
         try:
             # Fail before any branch is trained if a later one would refuse to save
@@ -66,7 +69,7 @@ def main(argv=None) -> int:
 
     gpu = select_gpu(args, [c for _, s, e in jobs for c in (s, e)])
     for b, s, e in jobs:
-        print_summary(s, e, gpu, args.smoke, f"train_lamturb.py: branch '{b}'")
+        print_summary(s, e, gpu, args.smoke, f"train_lamturb.py: branch '{b}'", plots_only=args.plots_only)
 
     device = utils.configure_devices(gpu)
     from src_err.training import run_branch  # imports TensorFlow (after the device set-up)
@@ -74,8 +77,8 @@ def main(argv=None) -> int:
     results = {}
     for i, (b, s, e) in enumerate(jobs):
         try:
-            results[b] = run_branch(s, e, device, smoke=args.smoke, branch_label=b)
-        except FileExistsError as exc:
+            results[b] = run_branch(s, e, device, smoke=args.smoke, branch_label=b, plots_only=args.plots_only)
+        except (FileExistsError, FileNotFoundError) as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             return 3
         if i < len(jobs) - 1:

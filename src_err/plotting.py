@@ -12,6 +12,8 @@ Figure families (``<prefix>_`` is prepended when ``prefix`` is non-empty):
 - ``cf_lines`` / ``cf_lines_ma``: |C_f| at the selected stations, raw and moving-averaged;
 - ``pdf_errors`` / ``pdf_confidence``: error and confidence PDFs;
 - ``confusion_matrix``, ``sngp_history``, ``error_history``: training diagnostics;
+- ``<set>_<metric>_<scale>``: predictions over the input planes pi_1-pi_2 and pi_1-pi_3
+  (all-cases test and training diagnostics);
 - ``<RunName>_<fig>[_log]``: figures of the all-cases test (test_turb_allcases.py; see the README).
 
 Conventions:
@@ -37,7 +39,7 @@ from matplotlib import colors
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import LogFormatterMathtext
+from matplotlib.ticker import FixedLocator, LogFormatterMathtext, NullFormatter
 
 # ---------------------------------------------------------------------------
 # Colours and names
@@ -1320,3 +1322,231 @@ def plot_pdf_always_vs_blended(e_base: np.ndarray, e_always: np.ndarray, e_final
     _pdf_axes_style(ax, r"$\mathrm{Model\ Error\ (\%)}$", list(x_range), 20)
     fig.tight_layout()
     return _finish(fig, out_dir, name, formats, close)
+
+
+# ---------------------------------------------------------------------------
+# Input-space scatter plots (pi_1-pi_2 and pi_1-pi_3 planes)
+# ---------------------------------------------------------------------------
+
+# Metrics of the input-space figures: (colourbar label, scale, colour-range option). All are
+# plotted as magnitudes; 'log' metrics use LogNorm over the option's [min, max] ([] = 1st-99th
+# percentile of the positive values), 'unit' metrics Normalize over it.
+INPUT_SPACE_METRICS: Dict[str, Tuple[str, str, str]] = {
+    "sigma": (r"$\sigma_{\varepsilon}$", "log", "SigmaRange"),
+    "sigma_pct": (r"$\sigma_{\varepsilon}\ (\%)$", "log", "PercentRange"),
+    "mu": (r"$|\mu_{\varepsilon}|$", "log", "MuRange"),
+    "mu_pct": (r"$|\mu_{\varepsilon}|\ (\%)$", "log", "PercentRange"),
+    "confidence": (r"$C$", "unit", "ConfidenceRange"),
+}
+# Axis labels of the network inputs (InputScaling 2) and the (x, y) input columns of the two panels.
+INPUT_SPACE_AXES = (r"$\pi_1 = u_1 n_1/\nu$", r"$\pi_2 = u_p n_1/\nu$", r"$\pi_3 = u_2 n_1/\nu$")
+_INPUT_SPACE_PANELS = ((0, 1), (0, 2))
+_INPUT_SPACE_SEED = 0  # seed of the random draw order
+
+
+def _thin_symlog_ticks(axis, lo: float, hi: float, max_ticks: int = 9) -> None:
+    """Keep 0 and every other decade when a symlog axis spans too many decades for readable labels."""
+    ticks = [t for t in axis.get_major_locator().tick_values(lo, hi) if lo <= t <= hi]
+    if len(ticks) > max_ticks:
+        axis.set_major_locator(FixedLocator([t for t in ticks if t == 0 or round(np.log10(abs(t))) % 2 == 0]))
+
+
+def _input_space_norm(values: np.ndarray, scale: str, value_range) -> Tuple[Normalize, str]:
+    """Colour norm and colourbar 'extend' of one metric (values: finite magnitudes)."""
+    lim = _limits(value_range)
+    if scale == "unit":
+        lo, hi = lim or (0.0, 1.0)
+        norm = Normalize(vmin=lo, vmax=hi)
+    else:
+        if lim is None:
+            pos = values[values > 0.0]
+            lo, hi = (float(v) for v in np.percentile(pos, [1.0, 99.0])) if pos.size else (1e-3, 1.0)
+            lim = (lo, hi if hi > lo else 10.0 * lo)
+        norm = LogNorm(vmin=lim[0], vmax=lim[1])
+    below = values.size > 0 and float(np.min(values)) < norm.vmin
+    above = values.size > 0 and float(np.max(values)) > norm.vmax
+    return norm, {(True, True): "both", (True, False): "min", (False, True): "max"}.get((below, above), "neither")
+
+
+@_no_usetex
+def plot_input_space(X: np.ndarray, fields: Mapping[str, Optional[np.ndarray]],
+                     labels: Optional[np.ndarray] = None, class_names: Optional[Sequence[str]] = None,
+                     opts: Optional[Mapping] = None, prefix: str = "", *,
+                     background: Optional[np.ndarray] = None, background_label: str = "Training data",
+                     ood_mask: Optional[np.ndarray] = None, title: Optional[str] = None,
+                     out_dir: Optional[str] = None, formats: Sequence[str] = ("png",),
+                     close: bool = True) -> Dict[str, plt.Figure]:
+    """Per-point metrics over the network-input planes pi_1-pi_2 and pi_1-pi_3 (the notebooks' u1-up / u1-u2 scatters).
+
+    One figure per metric and axis scale, with two panels (pi_1-pi_2 left, pi_1-pi_3 right) and
+    one colourbar. Points are drawn in a seeded random order, so that no dataset systematically
+    hides another; the scatter layers are rasterized (small vector files).
+
+    Args:
+        X: network inputs (N, 3) [pi_1, pi_2, pi_3] (InputScaling 2).
+        fields: metric key (INPUT_SPACE_METRICS: 'sigma', 'sigma_pct', 'mu', 'mu_pct',
+            'confidence') -> (N,) values; plotted as magnitudes; None entries are skipped.
+        labels: predicted class labels (N,) indexing class_names, for the 'class' figure, or None.
+        class_names: display names in label order (may already contain 'OOD').
+        opts: ``[plots.input_space]``: Scale ('symlog' | 'linear' | 'both', default 'symlog'),
+            LinThresh (1; linear range of the symlog axes), LinearLimits / SymlogLimits
+            ({'Pi1', 'Pi2', 'Pi3'}: [min, max], [] or absent = data range; the TOMLs' LinearLimits
+            default to config.INPUT_SPACE_LINEAR_LIMITS), MarkerSize (1), BackgroundAlpha (0.1)
+            and the colour ranges PercentRange ([1, 100]), SigmaRange / MuRange ([] = 1st-99th
+            percentile), ConfidenceRange ([0, 1]).
+        prefix: file-name stem; files '<prefix>_<metric>_<scale>' ('class' for the labels).
+        background: inputs (M, 3) drawn in black behind the points (e.g. the training data), or None.
+        background_label: legend entry of the background.
+        ood_mask: points relabelled 'OOD' in the class figure (C below a threshold), or None.
+        title: figure title, or None.
+        out_dir, formats: saving (None: no saving).
+        close: close figures after saving.
+
+    Returns:
+        Dict '<metric>_<scale>' -> figure ('class_<scale>' for the labels).
+    """
+    opts = dict(opts or {})
+    X = np.asarray(X, dtype=float)
+    if X.ndim != 2 or X.shape[1] < 3:
+        raise ValueError(f"plot_input_space: X must have shape (N, 3), got {X.shape}")
+    if len(X) == 0:
+        warnings.warn("plot_input_space: no points; nothing plotted")
+        return {}
+    scale = str(opts.get("Scale", "symlog"))
+    scales = ["symlog", "linear"] if scale == "both" else [scale]
+    ms = float(opts.get("MarkerSize", 1.0))
+    alpha_bg = float(opts.get("BackgroundAlpha", 0.1))
+    lin_thresh = float(opts.get("LinThresh", 1.0))
+    order = np.random.default_rng(_INPUT_SPACE_SEED).permutation(len(X))
+    Xo = X[order]
+    bg = None if background is None or len(background) == 0 else np.asarray(background, dtype=float)
+
+    def _panels(sc_name, draw):
+        """Two-panel figure: background, the scatter layer from draw(ax, xi, yi), axes; returns (fig, axes, mappable)."""
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6.5), layout="constrained")
+        lims = opts.get("SymlogLimits" if sc_name == "symlog" else "LinearLimits") or {}
+        mappable = None
+        for ax, (xi, yi) in zip(axes, _INPUT_SPACE_PANELS):
+            if bg is not None:
+                ax.scatter(bg[:, xi], bg[:, yi], c="k", s=ms, alpha=alpha_bg, linewidths=0, rasterized=True)
+            mappable = draw(ax, xi, yi)
+            if sc_name == "symlog":
+                ax.set_xscale("symlog", linthresh=lin_thresh)
+                ax.set_yscale("symlog", linthresh=lin_thresh)
+            for setter, col in ((ax.set_xlim, xi), (ax.set_ylim, yi)):
+                lim = _limits(lims.get(f"Pi{col + 1}"))
+                if lim is not None:
+                    setter(*lim)
+            if sc_name == "symlog":
+                _thin_symlog_ticks(ax.xaxis, *ax.get_xlim())
+                _thin_symlog_ticks(ax.yaxis, *ax.get_ylim())
+            ax.set_xlabel(INPUT_SPACE_AXES[xi], fontsize=20)
+            ax.set_ylabel(INPUT_SPACE_AXES[yi], fontsize=20)
+            ax.tick_params(labelsize=14)
+        if bg is not None:
+            handle = Line2D([], [], ls="", marker="o", color="k", alpha=max(alpha_bg, 0.4), label=background_label)
+            axes[0].legend(handles=[handle], loc="best", fontsize=12)
+        if title:
+            fig.suptitle(title, fontsize=16)
+        return fig, axes, mappable
+
+    figs: Dict[str, plt.Figure] = {}
+    for key, values in fields.items():
+        if values is None:
+            continue
+        if key not in INPUT_SPACE_METRICS:
+            raise ValueError(f"plot_input_space: unknown metric '{key}'; known: {list(INPUT_SPACE_METRICS)}")
+        cl, kind, range_key = INPUT_SPACE_METRICS[key]
+        v = np.abs(np.asarray(values, dtype=float).ravel())[order]
+        ok = np.isfinite(v)
+        norm, extend = _input_space_norm(v[ok], kind, opts.get(range_key))
+        if kind == "log":
+            v = np.clip(v, 1e-12, None)  # zeros would be masked by LogNorm: show them in the lowest colour
+        for sc_name in scales:
+            fig, axes, sc = _panels(sc_name, lambda ax, xi, yi: ax.scatter(
+                Xo[ok, xi], Xo[ok, yi], c=v[ok], cmap="viridis", norm=norm, s=ms, linewidths=0, rasterized=True))
+            cbar = fig.colorbar(sc, ax=list(axes), extend=extend, shrink=0.9, pad=0.02)
+            cbar.set_label(cl, fontsize=18)
+            if kind == "log":
+                ticks = _log10_ticks(norm.vmin, norm.vmax)
+                if len(ticks) >= 2:
+                    cbar.set_ticks(ticks)
+                    cbar.ax.yaxis.set_major_formatter(LogFormatterMathtext(base=10))
+                else:  # range within about a decade: a few plain labels, as many digits as needed to tell them apart
+                    ticks = np.geomspace(norm.vmin, norm.vmax, 5)
+                    digits = next((d for d in range(3, 9) if len({f"{t:.{d}g}" for t in ticks}) == len(ticks)), 9)
+                    cbar.set_ticks(ticks, labels=[f"{t:.{digits}g}" for t in ticks])
+                cbar.ax.yaxis.set_minor_formatter(NullFormatter())
+            cbar.ax.tick_params(which="both", labelsize=14)
+            figs[f"{key}_{sc_name}"] = _finish(fig, out_dir, _name(prefix, key, sc_name), formats, close)
+
+    if labels is not None:
+        if class_names is None:
+            raise ValueError("plot_input_space: class_names is required with labels")
+        lab, names = labels_with_ood(labels, class_names, ood_mask)
+        lab = lab[order]
+        cmap = colors.ListedColormap(class_colors(names))
+        norm = colors.BoundaryNorm(np.arange(-0.5, len(names) + 0.5, 1), cmap.N)
+        for sc_name in scales:
+            fig, axes, sc = _panels(sc_name, lambda ax, xi, yi: ax.scatter(
+                Xo[:, xi], Xo[:, yi], c=lab, cmap=cmap, norm=norm, s=ms, linewidths=0, rasterized=True))
+            _class_colorbar(fig, list(axes), sc, names)
+            figs[f"class_{sc_name}"] = _finish(fig, out_dir, _name(prefix, "class", sc_name), formats, close)
+    return figs
+
+
+def plot_input_space_sets(X: np.ndarray, fields: Mapping[str, Optional[np.ndarray]],
+                          sets: Mapping[str, np.ndarray], opts: Mapping, prefix: str = "", *,
+                          labels: Optional[np.ndarray] = None, class_names: Optional[Sequence[str]] = None,
+                          ood_mask: Optional[np.ndarray] = None, titles: Optional[Mapping[str, str]] = None,
+                          background_label: str = "Training data", out_dir: Optional[str] = None,
+                          formats: Sequence[str] = ("png",)) -> List[str]:
+    """Input-space figures (plot_input_space) of the point sets selected by ``opts['Sets']``.
+
+    The first entry of ``sets`` is the training set: with ``opts['TrainingBackground']`` its
+    inputs are drawn in black behind every other set. Used by test_turb_allcases.py (sets
+    'train' / 'test': training and test datasets) and by the training scripts ('train' /
+    'valid': the model's train and validation splits).
+
+    Args:
+        X: network inputs (N, 3) of all points.
+        fields: metric key -> (N,) values (see plot_input_space).
+        sets: ordered {set name: boolean (N,) mask}, training set first.
+        opts: ``[plots.input_space]`` (Sets: a set name, 'both' = all sets, or 'none';
+            TrainingBackground; the plot_input_space options).
+        prefix: file-name stem; files '<prefix>_<set>_<metric>_<scale>'.
+        labels, class_names, ood_mask: class figure (see plot_input_space), or None.
+        titles: {set name: figure title}.
+        background_label: legend entry of the training-set background.
+        out_dir, formats: saving.
+
+    Returns:
+        Names of the figures written (without extension).
+    """
+    which = str(opts.get("Sets", "both"))
+    if which == "none":
+        return []
+    names = list(sets)
+    if which != "both" and which not in sets:
+        raise ValueError(f"Sets = '{which}' is none of {names + ['both', 'none']}")
+    X = np.asarray(X, dtype=float)
+    train_mask = np.asarray(sets[names[0]], dtype=bool)
+    written: List[str] = []
+    for s in (names if which == "both" else [which]):
+        m = np.asarray(sets[s], dtype=bool)
+        if not np.any(m):
+            print(f"WARNING: no '{s}' points; their input-space figures are skipped")
+            continue
+        background = None
+        if s != names[0] and opts.get("TrainingBackground", False):
+            background = X[train_mask]
+            if len(background) == 0:
+                print(f"WARNING: no '{names[0]}' points for the background of the '{s}' figures")
+        figs = plot_input_space(
+            X[m], {k: (None if v is None else np.asarray(v)[m]) for k, v in fields.items()},
+            labels=None if labels is None else np.asarray(labels)[m], class_names=class_names, opts=opts,
+            prefix=_name(prefix, s), background=background, background_label=background_label,
+            ood_mask=None if ood_mask is None else np.asarray(ood_mask, dtype=bool)[m],
+            title=(titles or {}).get(s), out_dir=out_dir, formats=formats)
+        written += [_name(prefix, s, k) for k in figs]
+    return written

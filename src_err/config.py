@@ -81,6 +81,12 @@ def _positive_items(v: List[int]) -> Optional[str]:
     return None if all(x > 0 for x in v) else "entries must be > 0"
 
 
+def _positive_pair_or_empty(v: List[float]) -> Optional[str]:
+    if len(v) not in (0, 2):
+        return "must be [] or [min, max]"
+    return None if all(x > 0 for x in v) else "entries must be > 0 (logarithmic colour scale)"
+
+
 def _ramp(threshold: float, delta: float, enum_type: Optional[List[str]] = None,
           type_default: Optional[str] = None) -> Dict[str, Any]:
     """Schema of a smooth-ramp gate {Threshold, Delta} (inline table in the TOMLs)."""
@@ -107,6 +113,62 @@ SHIPPED_LAM_ERROR = "error/error_model_Baseline_selftrained_lam_Add_ExpertExtFlo
 FIGURE_FORMATS = ["png", "pdf", "svg", "jpg", "eps"]
 # PDF estimators of src_err/plotting.py ('hist' is an alias of 'histogram')
 PDF_METHODS = ["kde", "histogram", "hist", "both"]
+# Input-space figures (src_err/plotting.plot_input_space): metrics per model kind and the linear axis
+# limits of the notebooks' input-space plots (u1 n1/nu and u2 n1/nu: -5000..20000, up n1/nu: -200..200)
+INPUT_SPACE_METRICS = {"error": ["sigma", "sigma_pct", "mu", "mu_pct"], "sngp": ["confidence", "class"]}
+INPUT_SPACE_LINEAR_LIMITS = {"Pi1": [-5000.0, 20000.0], "Pi2": [-200.0, 200.0], "Pi3": [-5000.0, 20000.0]}
+
+# ---------------------------------------------------------------------------------------
+# Input-space figures ([plots.input_space] of the training and all-cases test TOMLs)
+# ---------------------------------------------------------------------------------------
+
+
+def input_space_schema(kind: str) -> Dict[str, Any]:
+    """
+    Schema of [plots.input_space]: predictions over the input planes pi_1-pi_2 and pi_1-pi_3
+
+    Args:
+        kind: 'sngp' or 'error' (training TOMLs: sets 'train'/'valid', the model's own metrics) or
+              'benchmark' (test_turb_allcases.toml: sets 'train'/'test' = training/test datasets, all metrics)
+
+    Returns:
+        Schema dict
+    """
+    benchmark = kind == "benchmark"
+    metrics = INPUT_SPACE_METRICS["error"] + INPUT_SPACE_METRICS["sngp"] if benchmark else INPUT_SPACE_METRICS[kind]
+    table: Dict[str, Any] = {
+        "Sets": Key("str", "both", enum=["train", "test" if benchmark else "valid", "both", "none"]),
+        "Metrics": Key("list[str]", list(metrics), enum=list(metrics)),
+        "TrainingBackground": Key("bool", False),
+        "BackgroundAlpha": Key("float", 0.1, check=_fraction),
+        "Scale": Key("str", "symlog", enum=["symlog", "linear", "both"]),
+        "LinThresh": Key("float", 1.0, check=_positive),
+        "LinearLimits": {p: Key("list[float]", list(v), check=_pair) for p, v in INPUT_SPACE_LINEAR_LIMITS.items()},
+        "SymlogLimits": {p: Key("list[float]", [], check=_pair_or_empty) for p in INPUT_SPACE_LINEAR_LIMITS},
+        "MarkerSize": Key("float", 1.0, check=_positive),
+    }
+    if kind != "sngp":
+        table.update({
+            "PercentRange": Key("list[float]", [1.0, 100.0], check=_positive_pair_or_empty),
+            "SigmaRange": Key("list[float]", [], check=_positive_pair_or_empty),
+            "MuRange": Key("list[float]", [], check=_positive_pair_or_empty),
+        })
+    if kind != "error":
+        table["ConfidenceRange"] = Key("list[float]", [0.0, 1.0], check=_pair)
+    if kind == "error":
+        # sigma% and mu% blend at small |pi_out,baseline|, as [gates].LowValue of the test TOMLs
+        table["LowValue"] = _ramp(2.0, 1.0)
+    if kind == "sngp":
+        # Points with C below this are drawn as 'OOD' in the class figures (0 = off); the test scripts use
+        # [gates].Confidence.Threshold
+        table["OodThreshold"] = Key("float", 0.7, check=lambda v: None if 0.0 <= v <= 1.0 else "must be in [0, 1]")
+    return table
+
+
+def input_space_defaults(kind: str) -> Dict[str, Any]:
+    """Default [plots.input_space] table of a TOML kind (see input_space_schema)."""
+    return validate({}, input_space_schema(kind), f"[plots.input_space] defaults ({kind})")
+
 
 # ---------------------------------------------------------------------------------------
 # Training schemas (sngp/*.toml, error/*.toml)
@@ -170,6 +232,7 @@ def sngp_schema() -> Dict[str, Any]:
             "DecayUnit": Key("str", "epoch", enum=["epoch", "step"]),
             "ClassWeights": Key("str", "balanced", enum=["balanced", "none"]),
         },
+        "plots": {"input_space": input_space_schema("sngp")},
     }
 
 
@@ -199,6 +262,7 @@ def error_schema() -> Dict[str, Any]:
                 "SaveInterval": Key("int", 1000),
             },
         },
+        "plots": {"input_space": input_space_schema("error")},
     }
 
 
@@ -337,6 +401,7 @@ def benchmark_schema() -> Dict[str, Any]:
             "GpuNum": Key("int", 0),
         },
         "models": _models_schema("turb"),
+        "classes": _test_classes_schema(),
         "data": {
             # The 75 EVB keys live in the shipped TOML; no implicit default list
             "Datasets": Key("list[str]", check=lambda v: None if v else "must not be empty"),
@@ -378,6 +443,7 @@ def benchmark_schema() -> Dict[str, Any]:
             "PdfBins": Key("int", 50, check=_positive),
             "PdfCurves": Key("list[str]", ["baseline", "final"], enum=["baseline", "final", "eqwm", "always"]),
             "PdfSubset": Key("str", "all", enum=["all", "train", "test"]),
+            "input_space": input_space_schema("benchmark"),
         },
     }
 
@@ -911,6 +977,8 @@ def load_benchmark_config(arg: str) -> Dict[str, Any]:
     errors: List[str] = []
     _check_gates(cfg, errors)
     _check_groups(cfg["groups"], "groups", errors)
+    if cfg["classes"]["PosthocGroups"]:
+        _check_groups(cfg["classes"]["PosthocGroups"], "classes.PosthocGroups", errors)
     datasets = set(cfg["data"]["Datasets"])
     for gname, members in cfg["groups"].items():
         missing = [m for m in members if m not in datasets]

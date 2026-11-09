@@ -2,8 +2,10 @@
 A-priori test of the turbulent BFM wall model (baseline + error model + SNGP + EQWM) on all cases
 
     python test_turb_allcases.py test/test_turb_allcases.toml [--gpu N] [--output-dir DIR]
-           [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both] [--dry-run]
-    python test_turb_allcases.py [<toml>] --replot RUN_DIR [--scale linear|log|both] [--output-dir DIR]
+           [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both]
+           [--input-space train|test|both|none] [--[no-]training-background] [--dry-run]
+    python test_turb_allcases.py [<toml>] --replot RUN_DIR [--scale linear|log|both]
+           [--input-space ...] [--[no-]training-background] [--output-dir DIR]
 
 Port of the Error_vs_baseline_plotting notebooks (EVB, its log-log variant and the AIAA
 always-vs-blended PDF) onto the shared v2 pipeline (src_err/pipeline.predict_turb, the same
@@ -16,8 +18,12 @@ median and P90 of |e%| are aggregated; one marker per case is plotted at
 
 Outputs in the output directory: cases.csv (one row per case, group member and skipped
 dataset), overall.json (resolved config, model paths, git commit, versions, overall
-averages), points.npz (per-point errors/confidence/weights with dataset tag and role) and
-the figures <RunName>_<figure>[_log].<fmt>. `--replot RUN_DIR` regenerates every figure from
+averages), points.npz (per-point errors/confidence/weights, network inputs, predicted
+sigma/mu and class with dataset tag and role), the figures <RunName>_<figure>[_log].<fmt>
+and, in input_space/, the predictions (sigma, sigma%, |mu|, |mu|%, C, class) over the input
+planes pi_1-pi_2 and pi_1-pi_3 of the training and of the test datasets
+(<RunName>_<train|test>_<metric>_<symlog|linear>.<fmt>, [plots.input_space]; the training
+datasets can be drawn in black behind the test datasets). `--replot RUN_DIR` regenerates every figure from
 RUN_DIR/cases.csv + points.npz without importing torch or TensorFlow (plot options from the
 given TOML, else from RUN_DIR/overall.json). `--dry-run` validates the TOML and resolves
 every dataset file without loading any model.
@@ -41,7 +47,12 @@ POINT_FIELDS = {
     "e_eqwm_pct": "e_eqwm_pct", "sigma_pct": "sigma_pct", "confidence": "confidence",
     "alpha_a": "alpha_a", "alpha_c": "alpha_c", "alpha_nw": "alpha_nw",
     "y_true": "y_true", "y_base": "y_base", "y_final": "y_final", "y_eqwm": "y_eqwm",
+    "sigma": "sigma", "mu": "mu", "mu_pct": "mu_pct",
 }
+# Network inputs [pi_1, pi_2, pi_3] (float32) and the predicted post-hoc class (int16, index into 'class_names')
+INPUT_FIELDS = ("pi1", "pi2", "pi3")
+LABEL_FIELD = "label"
+STORED_FIELDS = list(POINT_FIELDS.values()) + list(INPUT_FIELDS) + [LABEL_FIELD]
 # Error families: cases.csv column prefix -> points.npz field
 ERROR_FAMILIES = {"base": "e_base_pct", "final": "e_final_pct", "always": "e_always_pct", "eqwm": "e_eqwm_pct"}
 ROLE_TRAINING, ROLE_UNTRAINED = "training", "untrained"
@@ -70,6 +81,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="evaluate only these dataset keys (or [groups] names, expanded to their members)")
     parser.add_argument("--scale", choices=["linear", "log", "both"], default=None,
                         help="scatter axes; overrides [plots].Scale")
+    parser.add_argument("--input-space", choices=["train", "test", "both", "none"], default=None,
+                        help="input-space figures of the training datasets, the test datasets, both or none; "
+                             "overrides [plots.input_space].Sets")
+    parser.add_argument("--training-background", action=argparse.BooleanOptionalAction, default=None,
+                        help="draw the training datasets in black behind the test-dataset input-space figures; "
+                             "overrides [plots.input_space].TrainingBackground")
     parser.add_argument("--replot", default=None, metavar="RUN_DIR",
                         help="regenerate the figures from RUN_DIR/cases.csv + points.npz (no torch/TF, no inference)")
     parser.add_argument("--dry-run", action="store_true",
@@ -274,7 +291,7 @@ def _subset(p: Mapping[str, np.ndarray], mask: np.ndarray) -> Dict[str, np.ndarr
 
 
 def _concat(parts: Sequence[Mapping[str, np.ndarray]]) -> Dict[str, np.ndarray]:
-    return {k: np.concatenate([np.asarray(p[k]) for p in parts]) for k in POINT_FIELDS.values()}
+    return {k: np.concatenate([np.asarray(p[k]) for p in parts]) for k in STORED_FIELDS}
 
 
 def aggregate_cases(records: Mapping[str, Dict[str, Any]], keys: Sequence[str], groups: Mapping[str, Sequence[str]],
@@ -532,6 +549,8 @@ def run_dataset(key: str, models: Any, cfg: Mapping[str, Any], max_samples: int)
         rec["input_inconsistent_frac"] = input_consistency(arrays, models.baseline.config, verbose=False).get(key, np.nan)
         out = predict_turb(models, arrays, cfg)
         points = {name: np.asarray(out[k], dtype=np.float32) for k, name in POINT_FIELDS.items()}
+        points.update({name: np.asarray(arrays.X[:, j], dtype=np.float32) for j, name in enumerate(INPUT_FIELDS)})
+        points[LABEL_FIELD] = np.asarray(out["labels_posthoc"], dtype=np.int16)
         rec["used"] = evaluation_mask(points, cfg["evaluation"])
         rec["points"] = points
         if not np.any(rec["used"]):
@@ -554,9 +573,10 @@ def pool_points(records: Mapping[str, Mapping[str, Any]], keys: Sequence[str],
     Concatenate the per-point arrays of all evaluated datasets (points.npz content)
 
     Returns:
-        POINT_FIELDS arrays + 'dataset' (int index into 'dataset_keys'), 'case' (index into
-        'case_names': the group name for group members, else the display name), 'training'
-        (bool, role of the plotted case), 'used' (evaluation mask)
+        STORED_FIELDS arrays (POINT_FIELDS, the inputs pi1-pi3 and the class 'label') +
+        'dataset' (int index into 'dataset_keys'), 'case' (index into 'case_names': the group
+        name for group members, else the display name), 'training' (bool, role of the plotted
+        case), 'used' (evaluation mask)
     """
     member_of = group_of(groups)
     ok = [k for k in keys if "points" in records[k]]
@@ -574,7 +594,7 @@ def pool_points(records: Mapping[str, Mapping[str, Any]], keys: Sequence[str],
         train.append(np.full(n, roles[k] == ROLE_TRAINING))
         used.append(np.asarray(rec["used"], dtype=bool))
     if not parts:
-        empty = {name: np.zeros(0, dtype=np.float32) for name in POINT_FIELDS.values()}
+        empty = {name: np.zeros(0, dtype=np.int16 if name == LABEL_FIELD else np.float32) for name in STORED_FIELDS}
         empty.update(dataset=np.zeros(0, np.int32), case=np.zeros(0, np.int32), training=np.zeros(0, bool),
                      used=np.zeros(0, bool), dataset_keys=np.asarray([], dtype=str),
                      case_names=np.asarray([], dtype=str))
@@ -594,7 +614,8 @@ def pool_points(records: Mapping[str, Mapping[str, Any]], keys: Sequence[str],
 def make_figures(rows: Sequence[Mapping[str, Any]], points: Mapping[str, np.ndarray], cfg: Mapping[str, Any],
                  out_dir: str, scale: Optional[str]) -> List[str]:
     """
-    Scatter figures (train_test, zoom, sigma, confidence; linear and/or log) and the PDFs
+    Scatter figures (train_test, zoom, sigma, confidence; linear and/or log), the PDFs and the
+    input-space figures (in out_dir/input_space)
 
     Args:
         rows: cases.csv rows
@@ -640,8 +661,58 @@ def make_figures(rows: Sequence[Mapping[str, Any]], points: Mapping[str, np.ndar
         written += [f"{run_name}_{k}" for k in figs]
     else:
         print("WARNING: no used points; PDF figures skipped")
+    written += input_space_figures(points, cfg, out_dir)
     print(f"Figures written to {out_dir}: {', '.join(written) or 'none'}")
     return written
+
+
+def input_space_figures(points: Mapping[str, np.ndarray], cfg: Mapping[str, Any], out_dir: str) -> List[str]:
+    """
+    Predictions over the input planes pi_1-pi_2 and pi_1-pi_3 ([plots.input_space])
+
+    One figure per set (training datasets 'train', test datasets 'test'), metric and axis
+    scale, in out_dir/input_space. Points as in the statistics (the used points); the class
+    figure relabels C < [gates].Confidence.Threshold as 'OOD'; with TrainingBackground the
+    training datasets are drawn in black behind the test datasets.
+
+    Args:
+        points: Pooled per-point arrays (points.npz)
+        cfg: Config with [general], [plots.input_space], [gates]
+        out_dir: Output directory of the run
+
+    Returns:
+        Figure names written (relative to out_dir, without extension)
+    """
+    from src_err import plotting
+
+    opts = cfg["plots"]["input_space"]
+    if opts["Sets"] == "none" or not opts["Metrics"]:
+        return []
+    missing = [f for f in (*INPUT_FIELDS, LABEL_FIELD, "sigma", "mu", "mu_pct") if f not in points]
+    if missing:
+        print(f"WARNING: points.npz lacks {missing} (written by an older version); input-space figures skipped")
+        return []
+    used = np.asarray(points["used"], dtype=bool)
+    if not used.any():
+        print("WARNING: no used points; input-space figures skipped")
+        return []
+    X = np.stack([np.asarray(points[f])[used] for f in INPUT_FIELDS], axis=1)
+    train = np.asarray(points["training"], dtype=bool)[used]
+    dataset = np.asarray(points["dataset"])[used]
+    fields = {m: np.asarray(points[m])[used] for m in opts["Metrics"] if m != "class"}
+    labels = class_names = ood = None
+    if "class" in opts["Metrics"]:
+        labels = np.asarray(points[LABEL_FIELD], dtype=np.int64)[used]
+        class_names = [str(n) for n in points["class_names"]]
+        ood = np.asarray(points["confidence"])[used] < cfg["gates"]["Confidence"]["Threshold"]
+    titles = {}
+    for name, m, what in (("train", train, "Training"), ("test", ~train, "Test")):
+        titles[name] = f"{what} datasets ({np.unique(dataset[m]).size} datasets, {int(m.sum()):,} points)"
+    figs = plotting.plot_input_space_sets(
+        X, fields, {"train": train, "test": ~train}, opts, cfg["general"]["RunName"], labels=labels,
+        class_names=class_names, ood_mask=ood, titles=titles, background_label="Training datasets",
+        out_dir=os.path.join(out_dir, "input_space"), formats=cfg["general"]["Formats"])
+    return [os.path.join("input_space", f) for f in figs]
 
 
 # ---------------------------------------------------------------------------------------
@@ -698,9 +769,21 @@ def print_config(cfg: Mapping[str, Any], keys: Sequence[str], groups: Mapping[st
     print(f"  evaluation    : domain filter {domain_desc}; outliers > {ev['OutlierPercent']:g} % (joint); "
           f"error change > {ev['MinErrorChangePercent']:g} % ({'on' if ev['MinErrorChangePercent'] > 0 else 'off'}); "
           f"always-corrected {'on' if ev['CompareAlways'] else 'off'}")
+    isp = cfg["plots"]["input_space"]
+    print(f"  input space   : sets {isp['Sets']}, scale {isp['Scale']}, training background "
+          f"{'on' if isp['TrainingBackground'] else 'off'}, metrics {isp['Metrics']}")
     print(f"  output        : {out_dir};  formats {cfg['general']['Formats']};  device "
           f"{'CPU' if gpu < 0 else 'GPU ' + str(gpu)}")
     print("=" * 80)
+
+
+def apply_input_space_flags(args: argparse.Namespace, cfg: Dict[str, Any]) -> None:
+    """--input-space / --[no-]training-background override [plots.input_space] (in place)."""
+    opts = cfg["plots"]["input_space"]
+    if args.input_space is not None:
+        opts["Sets"] = args.input_space
+    if args.training_background is not None:
+        opts["TrainingBackground"] = args.training_background
 
 
 def _domain_description(ev: Mapping[str, Any]) -> str:
@@ -769,6 +852,7 @@ def run(args: argparse.Namespace) -> None:
     max_samples = cfg["data"]["MaxSamplesPerDataset"] if args.max_samples is None else args.max_samples
     if args.scale is not None:
         cfg["plots"]["Scale"] = args.scale
+    apply_input_space_flags(args, cfg)
     domain_desc = _domain_description(cfg["evaluation"])
     print_config(cfg, keys, groups, out_dir, gpu, max_samples, domain_desc)
     if args.dry_run:
@@ -787,10 +871,11 @@ def run(args: argparse.Namespace) -> None:
     timings: Dict[str, float] = {}
     t0 = time.time()
 
-    from src_err.pipeline import load_branch_models
+    from src_err.pipeline import class_names_for_plot, load_branch_models
     device = utils.configure_devices(gpu)
-    # The benchmark has no class plots: no post-hoc groups / display names needed from [classes]
-    models = load_branch_models(cfg["models"], {}, device, branch="turb")
+    # Post-hoc groups and display names of the class figures: [classes], else the SNGP metadata
+    models = load_branch_models(cfg["models"], cfg["classes"], device, branch="turb")
+    class_names = class_names_for_plot(models)
     timings["load_models"] = time.time() - t0
 
     records: Dict[str, Dict[str, Any]] = {}
@@ -814,6 +899,7 @@ def run(args: argparse.Namespace) -> None:
 
     rows = aggregate_cases(records, keys, groups, roles, group_roles, display, cfg["evaluation"], compare_always)
     points = pool_points(records, keys, roles, groups, display)
+    points["class_names"] = np.asarray(class_names, dtype=str)
     overall = overall_statistics(rows, points, compare_always)
     print_case_table(rows, overall, compare_always)
     print_domain_table(records, keys, domain_desc)
@@ -847,6 +933,7 @@ def run(args: argparse.Namespace) -> None:
         "groups": {g: list(m) for g, m in groups.items()},
         "roles": {"datasets": {k: roles[k] for k in keys}, "groups": dict(group_roles)},
         "domain_filter": domain_desc,
+        "class_names": class_names,
         "overall": overall,
         "skipped": skipped,
         "input_inconsistent": inconsistent,
@@ -880,8 +967,12 @@ def replot(args: argparse.Namespace) -> None:
         with open(path, "r", encoding="utf-8") as handle:
             cfg = json.load(handle)["config"]
         source = path
+        if "input_space" not in cfg["plots"]:  # run of an older version
+            from src_err.config import input_space_defaults
+            cfg["plots"]["input_space"] = input_space_defaults("benchmark")
     if args.scale is not None:
         cfg["plots"]["Scale"] = args.scale
+    apply_input_space_flags(args, cfg)
     out_dir = args.output_dir or run_dir
     os.makedirs(out_dir, exist_ok=True)
     print("=" * 80)

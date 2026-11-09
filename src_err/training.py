@@ -16,7 +16,15 @@ Training orchestration of the SNGP confidence model and the error model
    baseline train/valid and extras train/valid data; statistics over the combined train
    data; train (best-epoch restore, snapshots), save, diagnostics.
 
-Both `train_turb.py` and `train_lamturb.py` (once per branch) call `run_branch`.
+Diagnostics go to results/training/<ModelName>/, including the input-space figures
+(input_space/<train|valid>_<metric>_<scale>.png, [plots.input_space]): the model's predictions
+(error model: sigma, sigma%, |mu|, |mu|%; SNGP: confidence and post-hoc class) over the input
+planes pi_1-pi_2 and pi_1-pi_3 of its train and validation splits.
+
+Both `train_turb.py` and `train_lamturb.py` (once per branch) call `run_branch`. With
+`plots_only=True` (--plots-only) nothing is trained: the training data are rebuilt from the TOML,
+checked against the split indices saved with the model (<SaveDir>/<ModelName>), and only the
+input-space figures of that saved model are written.
 
 Smoke mode (`smoke=True`, login-node test): Epochs -> 2, SaveDir -> ./results/smoke/models,
 Overwrite allowed, snapshots every epoch, and deterministic seeded row caps (20000 baseline
@@ -50,6 +58,7 @@ SMOKE_RESULTS_DIR = os.path.join(".", "results", "smoke", "training")
 RESULTS_DIR = os.path.join(".", "results", "training")
 SMOKE_CAPS = {"baseline_train": 20000, "baseline_valid": 5000, "extra_train": 5000, "extra_valid": 5000}
 SNGP_PREDICT_BATCH = 512  # the GP layer forms a B x B covariance per batch in inference
+INPUT_SPACE_CHUNK = 65536  # rows per SNGP probability block of the input-space figures (bounds the (N, K) memory)
 
 
 @dataclass
@@ -179,6 +188,173 @@ def _release_baseline_data(model) -> None:
     gc.collect()
 
 
+def _split_indices(split: dat.BaselineSplit, extras: _Extras, stride: int = 1) -> Dict[str, Any]:
+    """Arrays of the model's split_indices.npz (None entries are not saved)."""
+    out: Dict[str, Any] = {
+        "baseline_train_index": split.train_index,
+        "baseline_valid_index": split.valid_index,
+        "extra_train_index": extras.split.train_index if extras.split is not None else None,
+        "extra_valid_index": extras.split.valid_index if extras.split is not None else None,
+    }
+    if stride > 1:
+        out["baseline_stride"] = np.int64(stride)
+    return out
+
+
+def _load_trained(cfg: Dict[str, Any], kind: str, expected_split: Dict[str, Any]) -> Any:
+    """
+    --plots-only: the saved model of a training config, once the rebuilt data are checked to be its training data
+
+    Args:
+        cfg: Branch config (the model is <SaveDir>/<ModelName>)
+        kind: 'sngp' or 'error'
+        expected_split: _split_indices of the rebuilt data
+
+    Returns:
+        SngpBundle or ErrorBundle
+
+    Raises:
+        FileNotFoundError: No saved model
+        ValueError: The rebuilt split differs from the saved split_indices.npz
+    """
+    path = model_dir(cfg)
+    if not os.path.isdir(path):
+        raise FileNotFoundError(f"--plots-only: no trained {kind} model at {path}")
+    f = os.path.join(path, "assets", "split_indices.npz")
+    if os.path.isfile(f):
+        with np.load(f) as z:
+            stored = {k: z[k] for k in z.files}
+        bad = [k for k, v in expected_split.items()
+               if (k in stored) != (v is not None) or (v is not None and not np.array_equal(np.asarray(v), stored[k]))]
+        if bad:
+            raise ValueError(f"--plots-only: the train/valid data rebuilt from the TOML are not those {path} was trained "
+                             f"on ({', '.join(bad)} differ); use the TOML (data, Seed, checkpoint) it was trained with")
+        print(f"Rebuilt train/valid split matches {f}")
+    else:
+        print(f"WARNING: {f} not found: cannot check that the TOML rebuilds the training data of {path}")
+    if kind == "sngp":
+        from src_err.sngp import load_sngp
+        return load_sngp(path)
+    from src_err.error_model import load_error_model
+    return load_error_model(path)
+
+
+# ---------------------------------------------------------------------------------------
+# Input-space figures
+# ---------------------------------------------------------------------------------------
+
+
+def _input_space_enabled(cfg: Dict[str, Any], model_config: Dict[str, Any]) -> bool:
+    opts = cfg["plots"]["input_space"]
+    if opts["Sets"] == "none" or not opts["Metrics"]:
+        return False
+    scaling = model_config.get("model", {}).get("inputs", {}).get("InputScaling", 1)
+    if scaling != 2:
+        print(f"NOTE: InputScaling {scaling}: the input-space figures need the pi inputs of InputScaling 2; skipped")
+        return False
+    return True
+
+
+def _input_space_figures(cfg: Dict[str, Any], X_tr: np.ndarray, X_va: np.ndarray, fields: Dict[str, np.ndarray],
+                         out_dir: str, labels: Optional[np.ndarray] = None, class_names: Optional[List[str]] = None,
+                         ood: Optional[np.ndarray] = None) -> List[str]:
+    """Figures of the train ('train') and validation ('valid') splits; fields/labels cover X_tr then X_va."""
+    from src_err import plotting
+
+    X = np.concatenate([X_tr, X_va])
+    train = np.arange(len(X)) < len(X_tr)
+    name = cfg["general"]["ModelName"]
+    titles = {"train": f"{name}: training split ({len(X_tr):,} points)",
+              "valid": f"{name}: validation split ({len(X_va):,} points)"}
+    fig_dir = os.path.join(out_dir, "input_space")
+    figs = plotting.plot_input_space_sets(X, fields, {"train": train, "valid": ~train}, cfg["plots"]["input_space"],
+                                          labels=labels, class_names=class_names, ood_mask=ood, titles=titles,
+                                          background_label="Training split", out_dir=fig_dir)
+    print(f"{len(figs)} input-space figures written to {fig_dir}")
+    return figs
+
+
+def _error_input_space(bundle: Any, X_tr: np.ndarray, yb_tr: np.ndarray, X_va: np.ndarray, yb_va: np.ndarray,
+                       cfg: Dict[str, Any], model_config: Dict[str, Any], out_dir: str) -> List[str]:
+    """
+    Error model: sigma, sigma%, |mu|, |mu|% over the input planes of the train and validation splits
+
+    The percentages are relative to |pi_out,baseline| with the [plots.input_space].LowValue blend
+    (as sigma%/mu% in the test scripts); |pi_1| is the input X[:, 0] (InputScaling 2).
+
+    Args:
+        bundle: ErrorBundle (trained in memory or loaded)
+        X_tr, X_va: Raw inputs of the splits
+        yb_tr, yb_va: Raw baseline outputs of the splits
+        cfg: Error-model branch config
+        model_config: Baseline checkpoint config
+        out_dir: Diagnostics directory
+
+    Returns:
+        Figure names written
+    """
+    from src_err.error_model import predict_error
+    from src_err.evaluation import predicted_percent
+
+    if not _input_space_enabled(cfg, model_config):
+        return []
+    opts = cfg["plots"]["input_space"]
+    X = np.concatenate([X_tr, X_va])
+    y_b = np.abs(np.concatenate([yb_tr, yb_va]))
+    mu, sigma = predict_error(bundle, X)
+    pi1 = np.abs(X[:, 0])
+    low = opts["LowValue"]
+    fields = {"sigma": sigma, "mu": mu,
+              "sigma_pct": predicted_percent(sigma, y_b, pi1, low["Threshold"], low["Delta"]),
+              "mu_pct": predicted_percent(mu, y_b, pi1, low["Threshold"], low["Delta"])}
+    return _input_space_figures(cfg, X_tr, X_va, {m: fields[m] for m in opts["Metrics"]}, out_dir)
+
+
+def _sngp_input_space(model: Any, X_tr: np.ndarray, Xtr_n: np.ndarray, X_va: np.ndarray, Xva_n: np.ndarray,
+                      trained: cls.ClassMap, num_classes: int, cfg: Dict[str, Any], model_config: Dict[str, Any],
+                      out_dir: str) -> List[str]:
+    """
+    SNGP: confidence and predicted post-hoc class over the input planes of the train and validation splits
+
+    Labels: argmax over the trained classes, merged by [classes].PosthocGroups and shown with
+    [classes].DisplayNames; points with C < [plots.input_space].OodThreshold are drawn as 'OOD'.
+
+    Args:
+        model: SNGP Keras model (trained in memory or loaded); model(Xn) returns logits
+        X_tr, X_va: Raw inputs of the splits
+        Xtr_n, Xva_n: The same inputs z-scored with the model's statistics
+        trained: Trained classes
+        num_classes: GP output units K
+        cfg: SNGP branch config
+        model_config: Baseline checkpoint config
+        out_dir: Diagnostics directory
+
+    Returns:
+        Figure names written
+    """
+    from src_err import sngp
+
+    if not _input_space_enabled(cfg, model_config):
+        return []
+    opts = cfg["plots"]["input_space"]
+    k_tr = len(trained)
+    Xn = np.concatenate([Xtr_n, Xva_n])
+    conf = np.empty(len(Xn), dtype=np.float32)
+    pred = np.empty(len(Xn), dtype=np.int64)
+    for s in range(0, len(Xn), INPUT_SPACE_CHUNK):
+        probs = sngp.probabilities(_sngp_logits(model, Xn[s:s + INPUT_SPACE_CHUNK]))
+        conf[s:s + INPUT_SPACE_CHUNK] = sngp.oneclass_confidence(probs, k_tr, num_classes)
+        pred[s:s + INPUT_SPACE_CHUNK] = sngp.predict_labels(probs, k_tr)
+    fields = {"confidence": conf} if "confidence" in opts["Metrics"] else {}
+    labels = names = ood = None
+    if "class" in opts["Metrics"]:
+        _, merged_map, mapping = cls.posthoc_merge(np.zeros((1, num_classes)), trained, cfg["classes"]["PosthocGroups"])
+        labels = mapping[pred]
+        names = _display(merged_map, cfg["classes"]["DisplayNames"])
+        ood = conf < opts["OodThreshold"] if opts["OodThreshold"] > 0.0 else None
+    return _input_space_figures(cfg, X_tr, X_va, fields, out_dir, labels, names, ood)
+
+
 # ---------------------------------------------------------------------------------------
 # SNGP
 # ---------------------------------------------------------------------------------------
@@ -268,7 +444,7 @@ def _sngp_diagnostics(model, Xva_n: np.ndarray, yva: np.ndarray, trained: cls.Cl
 
 
 def train_sngp_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.BaselineSplit, extras: _Extras,
-                      smoke: bool, out_dir: str) -> Dict[str, Any]:
+                      smoke: bool, out_dir: str, plots_only: bool = False) -> Dict[str, Any]:
     """
     Assemble the SNGP data, train, save and write diagnostics (step 3 of the module docstring)
 
@@ -280,6 +456,7 @@ def train_sngp_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Bas
         extras: Additional datasets and their split
         smoke: Apply the smoke row caps
         out_dir: Diagnostics directory
+        plots_only: Do not train: write the input-space figures of the saved model
 
     Returns:
         Summary dict (model path, class maps, sizes)
@@ -347,8 +524,9 @@ def train_sngp_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Bas
     m_lab, m_map = cls.merge_groups(np.arange(len(map_r)), map_r, c["MergeGroups"])
     to_trained = {n: m_map.names[m] for n, m in zip(map_r.names, m_lab)}
     counts_tr, counts_va = cls.class_counts(y_tr, trained), cls.class_counts(y_va, trained)
-    _write_class_counts(out_dir, combined, removed, to_trained, cls.class_counts(lab_tr, combined),
-                        cls.class_counts(lab_va, combined), trained, display, counts_tr, counts_va)
+    if not plots_only:
+        _write_class_counts(out_dir, combined, removed, to_trained, cls.class_counts(lab_tr, combined),
+                            cls.class_counts(lab_va, combined), trained, display, counts_tr, counts_va)
 
     smoke_info = None
     if smoke:
@@ -366,6 +544,18 @@ def train_sngp_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Bas
         smoke_info = {"caps": dict(SMOKE_CAPS), "seed": seed, "n_train": int(len(y_tr)), "n_valid": int(len(y_va))}
         # Metadata counts describe the rows actually trained on (the CSV keeps the full-data counts)
         counts_tr, counts_va = cls.class_counts(y_tr, trained), cls.class_counts(y_va, trained)
+
+    split_indices = _split_indices(split, extras, stride)
+    if plots_only:
+        bundle = _load_trained(cfg, "sngp", split_indices)
+        if bundle.class_names != list(trained.names):
+            raise ValueError(f"--plots-only: the TOML's trained classes {list(trained.names)} differ from those of "
+                             f"{bundle.path} {bundle.class_names}")
+        _sngp_input_space(bundle.model, X_tr, sngp.normalize_inputs(X_tr, bundle.mean_X, bundle.std_X),
+                          X_va, sngp.normalize_inputs(X_va, bundle.mean_X, bundle.std_X), trained,
+                          bundle.num_classes, cfg, model.config, out_dir)
+        return {"path": bundle.path, "num_classes": bundle.num_classes, "num_classes_train": len(trained),
+                "n_train": int(len(y_tr)), "n_valid": int(len(y_va)), "diagnostics_dir": out_dir}
 
     Xtr_n = sngp.normalize_inputs(X_tr, mean_X, std_X)
     Xva_n = sngp.normalize_inputs(X_va, mean_X, std_X)
@@ -385,14 +575,6 @@ def train_sngp_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Bas
         config=config_to_metadata(cfg))
     if smoke_info is not None:
         metadata["bfmwm_v2"]["smoke"] = smoke_info
-    split_indices = {
-        "baseline_train_index": split.train_index,
-        "baseline_valid_index": split.valid_index,
-        "extra_train_index": extras.split.train_index if extras.split is not None else None,
-        "extra_valid_index": extras.split.valid_index if extras.split is not None else None,
-    }
-    if stride > 1:
-        split_indices["baseline_stride"] = np.int64(stride)
 
     path = None
     if g["Save"]:
@@ -401,6 +583,7 @@ def train_sngp_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Bas
     else:
         print("[general] Save = false: SNGP not saved")
     diag = _sngp_diagnostics(model_sngp, Xva_n, y_va, trained, cfg, history, out_dir)
+    _sngp_input_space(model_sngp, X_tr, Xtr_n, X_va, Xva_n, trained, int(c["NumClasses"]), cfg, model.config, out_dir)
     del model_sngp
     gc.collect()
     return {"path": path, "num_classes": int(c["NumClasses"]), "num_classes_train": len(trained),
@@ -415,7 +598,7 @@ def train_sngp_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Bas
 
 
 def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.BaselineSplit, extras: _Extras,
-                       smoke: bool, out_dir: str) -> Dict[str, Any]:
+                       smoke: bool, out_dir: str, plots_only: bool = False) -> Dict[str, Any]:
     """
     Assemble the error-model data, train, save and write diagnostics (step 4 of the module docstring)
 
@@ -427,6 +610,7 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
         extras: Additional datasets and their split
         smoke: Apply the smoke row caps
         out_dir: Diagnostics directory
+        plots_only: Do not train: write the input-space figures of the saved model
 
     Returns:
         Summary dict (model path, best epoch, sizes)
@@ -443,9 +627,10 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
     if extras.split is not None:
         parts["extra_train"] = (extras.split.train.X, extras.split.train.y)
         parts["extra_valid"] = (extras.split.valid.X, extras.split.valid.y)
-    errs = {}
+    errs, ybase = {}, {}
     for k, (X, y) in parts.items():
-        errs[k] = em.error_targets(y, dat.baseline_output(model, X))
+        ybase[k] = dat.baseline_output(model, X)
+        errs[k] = em.error_targets(y, ybase[k])
         print(f"  {k:<15} {len(X):9d} points, error mean {errs[k].mean():+.4g}, std {errs[k].std():.4g}")
 
     tr_keys = [k for k in parts if k.endswith("train")]
@@ -454,6 +639,8 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
     e_tr = np.concatenate([errs[k] for k in tr_keys])
     X_va = np.concatenate([parts[k][0] for k in va_keys])
     e_va = np.concatenate([errs[k] for k in va_keys])
+    yb_tr = np.concatenate([ybase[k] for k in tr_keys])
+    yb_va = np.concatenate([ybase[k] for k in va_keys])
     norm_stats = em.compute_norm_stats(X_tr, e_tr)
     print(f"Error-model statistics over the combined train data ({len(X_tr)} points): "
           f"x_mean {norm_stats['x_mean'].ravel()}, x_std {norm_stats['x_std'].ravel()}, "
@@ -471,7 +658,17 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
         s_tr, s_va = _cap(tr_keys), _cap(va_keys)
         print(f"Smoke caps {SMOKE_CAPS}: train {len(X_tr)} -> {len(s_tr)}, valid {len(X_va)} -> {len(s_va)}")
         X_tr, e_tr, X_va, e_va = X_tr[s_tr], e_tr[s_tr], X_va[s_va], e_va[s_va]
+        yb_tr, yb_va = yb_tr[s_tr], yb_va[s_va]
         smoke_info = {"caps": dict(SMOKE_CAPS), "seed": seed, "n_train": int(len(X_tr)), "n_valid": int(len(X_va))}
+
+    split_indices = _split_indices(split, extras)
+    if plots_only:
+        bundle = _load_trained(cfg, "error", split_indices)
+        _error_input_space(bundle, X_tr, yb_tr, X_va, yb_va, cfg, model.config, out_dir)
+        md = bundle.metadata
+        return {"path": bundle.path, "best_epoch": int(md.get("best_epoch", -1)),
+                "epochs_run": int(md.get("epochs_run", 0)), "n_train": int(len(X_tr)), "n_valid": int(len(X_va)),
+                "diagnostics_dir": out_dir}
 
     Xtr_n = em.normalize_inputs(X_tr, norm_stats["x_mean"], norm_stats["x_std"])
     Xva_n = em.normalize_inputs(X_va, norm_stats["x_mean"], norm_stats["x_std"])
@@ -496,12 +693,6 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
         versions=utils.software_versions(), git_commit=utils.git_commit_hash(), config=config_to_metadata(cfg))
     if smoke_info is not None:
         metadata["smoke"] = smoke_info
-    split_indices = {
-        "baseline_train_index": split.train_index,
-        "baseline_valid_index": split.valid_index,
-        "extra_train_index": extras.split.train_index if extras.split is not None else None,
-        "extra_valid_index": extras.split.valid_index if extras.split is not None else None,
-    }
     path = None
     if g["Save"]:
         path = em.save_error_model(model_err, model_dir(cfg), norm_stats, history=history, metadata=metadata,
@@ -509,7 +700,10 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
     else:
         print("[general] Save = false: error model not saved")
     plotting.plot_error_history(history, best_epoch, out_dir=out_dir)
-    del model_err
+    bundle = em.ErrorBundle(model=model_err, x_mean=norm_stats["x_mean"], x_std=norm_stats["x_std"],
+                            y_mean=float(norm_stats["y_mean"][0]), y_std=float(norm_stats["y_std"][0]))
+    _error_input_space(bundle, X_tr, yb_tr, X_va, yb_va, cfg, model.config, out_dir)
+    del bundle, model_err
     gc.collect()
     return {"path": path, "best_epoch": int(best_epoch), "epochs_run": epochs_run,
             "n_train": int(len(X_tr)), "n_valid": int(len(X_va)), "diagnostics_dir": out_dir}
@@ -521,7 +715,7 @@ def train_error_branch(cfg: Dict[str, Any], model, ckpt_path: str, split: dat.Ba
 
 
 def run_branch(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[str, Any]], device: Any,
-               smoke: bool = False, branch_label: str = "turb") -> Dict[str, Any]:
+               smoke: bool = False, branch_label: str = "turb", plots_only: bool = False) -> Dict[str, Any]:
     """
     Train the SNGP and/or the error model of one baseline checkpoint (steps 1-4 of the module docstring)
 
@@ -531,6 +725,7 @@ def run_branch(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[str,
         device: torch device of the baseline (from utils.configure_devices)
         smoke: Login-node smoke test (see the module docstring)
         branch_label: Name used in the log ('turb', 'lam')
+        plots_only: Train nothing; write the input-space figures of the saved models
 
     Returns:
         {'sngp': summary or None, 'error': summary or None, 'extras_shared': bool, ...}
@@ -545,13 +740,14 @@ def run_branch(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[str,
     if len(ckpts) != 1:
         raise ValueError(f"[{branch_label}] the SNGP and error-model TOMLs use different baseline checkpoints: {sorted(ckpts)}")
     checkpoint = ckpts.pop()
-    check_outputs(sngp_cfg, "sngp")
-    check_outputs(error_cfg, "error")
+    if not plots_only:
+        check_outputs(sngp_cfg, "sngp")
+        check_outputs(error_cfg, "error")
 
     _print_header(f"Branch '{branch_label}': " + " + ".join(
         n for n, c in (("SNGP " + (sngp_cfg or {}).get("general", {}).get("ModelName", ""), sngp_cfg),
                        ("error model " + (error_cfg or {}).get("general", {}).get("ModelName", ""), error_cfg)) if c)
-        + (" [SMOKE TEST]" if smoke else ""))
+        + (" [SMOKE TEST]" if smoke else "") + (" [PLOTS ONLY]" if plots_only else ""))
 
     seeds = [int(c["general"]["Seed"]) for c in cfgs]
     utils.set_seeds(seeds[0])
@@ -585,7 +781,7 @@ def run_branch(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[str,
     if sngp_cfg is not None:
         s_seed = int(sngp_cfg["general"]["Seed"])
         result["sngp"] = train_sngp_branch(sngp_cfg, model, ckpt_path, splits[s_seed], extras_s, smoke,
-                                           results_dir(sngp_cfg, smoke))
+                                           results_dir(sngp_cfg, smoke), plots_only=plots_only)
         result["sngp"]["n_extra"] = 0 if extras_s.arrays is None else len(extras_s.arrays)
     if error_cfg is not None:
         if extras_e is None:
@@ -605,7 +801,7 @@ def run_branch(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[str,
                       f"identical split indices: {same}")
         e_seed = int(error_cfg["general"]["Seed"])
         result["error"] = train_error_branch(error_cfg, model, ckpt_path, splits[e_seed], extras_e, smoke,
-                                             results_dir(error_cfg, smoke))
+                                             results_dir(error_cfg, smoke), plots_only=plots_only)
         result["error"]["n_extra"] = 0 if extras_e.arrays is None else len(extras_e.arrays)
 
     _print_header(f"Branch '{branch_label}' done")

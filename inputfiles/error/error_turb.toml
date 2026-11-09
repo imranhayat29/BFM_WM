@@ -58,3 +58,25 @@ MinDelta = 0.0               # minimum val_loss decrease counted as an improveme
 
 [training.Snapshots]
 SaveInterval = 1000          # full SavedModel every N epochs in <SaveDir>/checkpoints/<ModelName>/ckpt_XXXX; 0 = off
+
+[plots.input_space]
+# Diagnostics: the error model's predictions over the network-input planes pi_1-pi_2 and pi_1-pi_3 (pi_1 = u1 n1/nu,
+# pi_2 = up n1/nu, pi_3 = u2 n1/nu) of its train and validation splits, one figure per split, metric and axis scale
+# with both planes side by side: results/training/<ModelName>/input_space/<train|valid>_<metric>_<symlog|linear>.png.
+# Written after training, or for a saved model with --plots-only.
+Sets    = "both"                 # "train", "valid", "both" or "none"
+Metrics = ["sigma", "sigma_pct", "mu", "mu_pct"]
+                                 # sigma / mu: predicted aleatoric / epistemic error (pi_out units; |mu| plotted);
+                                 # *_pct: in % of |pi_out,baseline|, with the LowValue blend below
+LowValue = { Threshold = 2.0, Delta = 1.0 }   # below |pi_out,baseline| 2 +- 1 the % is relative to sqrt(|pi_1|) instead
+                                 # (as [gates.LowValue] of the test TOMLs)
+TrainingBackground = false       # true: draw the training split in black behind the validation split
+BackgroundAlpha    = 0.1         # opacity of the background points
+Scale     = "symlog"             # axes: "symlog" (logarithmic in |pi|, linear within +-LinThresh), "linear" or "both"
+LinThresh = 1.0                  # linear range of the symlog axes
+LinearLimits = { Pi1 = [-5000.0, 20000.0], Pi2 = [-200.0, 200.0], Pi3 = [-5000.0, 20000.0] }   # linear axis limits
+SymlogLimits = { Pi1 = [], Pi2 = [], Pi3 = [] }   # symlog axis limits ([] = data range)
+MarkerSize   = 1.0               # scatter marker size
+PercentRange = [1.0, 100.0]      # logarithmic colour range of sigma% and |mu|%
+SigmaRange   = []                # logarithmic colour range of sigma ([] = 1st-99th percentile of the plotted points)
+MuRange      = []                # logarithmic colour range of |mu| ([] = 1st-99th percentile)

@@ -45,6 +45,9 @@ def parse_train_args(argv: Optional[Sequence[str]], description: str, lamturb: b
     parser.add_argument("--gpu", type=int, default=None, help="GPU index, overrides [general] GpuNum (-1 = CPU)")
     parser.add_argument("--smoke", action="store_true",
                         help="smoke test: 2 epochs, capped samples, save to ./results/smoke/models/")
+    parser.add_argument("--plots-only", action="store_true",
+                        help="train nothing: rebuild the training data from the TOML and write the input-space figures "
+                             "of the saved model(s) <SaveDir>/<ModelName> to results/training/<ModelName>/input_space/")
     args = parser.parse_args(argv)
     if args.sngp is None and args.error is None:
         parser.error("at least one of --sngp and --error is required")
@@ -93,7 +96,7 @@ def check_pair(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[str,
 
 
 def print_summary(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[str, Any]], gpu: int,
-                  smoke: bool, title: str) -> None:
+                  smoke: bool, title: str, plots_only: bool = False) -> None:
     """
     Print the configuration summary of one branch before training
 
@@ -103,9 +106,10 @@ def print_summary(sngp_cfg: Optional[Dict[str, Any]], error_cfg: Optional[Dict[s
         gpu: Selected GPU index (-1 = CPU)
         smoke: Smoke-test mode (the output directory and epochs are overridden)
         title: First line of the summary
+        plots_only: --plots-only (input-space figures of the saved models, no training)
     """
     print("=" * 80)
-    print(title + ("  [SMOKE TEST]" if smoke else ""))
+    print(title + ("  [SMOKE TEST]" if smoke else "") + ("  [PLOTS ONLY: no training]" if plots_only else ""))
     print(f"  GPU: {gpu}")
     for kind, cfg in (("SNGP", sngp_cfg), ("Error model", error_cfg)):
         if cfg is None:

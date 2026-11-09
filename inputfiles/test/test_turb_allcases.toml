@@ -5,11 +5,12 @@
 # baseline vs mean |e%| of the blended (expert) model.
 # Run from the repository root:
 #   python test_turb_allcases.py test/test_turb_allcases.toml [--gpu N] [--output-dir DIR]
-#          [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both] [--dry-run]
-#   python test_turb_allcases.py [test/test_turb_allcases.toml] --replot RUN_DIR [--scale log]
+#          [--max-samples N] [--datasets k1 k2 ...] [--scale linear|log|both]
+#          [--input-space train|test|both|none] [--[no-]training-background] [--dry-run]
+#   python test_turb_allcases.py [test/test_turb_allcases.toml] --replot RUN_DIR [--scale log] [--input-space ...]
 # This file is self-contained (no inheritance from test_turb.toml): model paths and gate thresholds are repeated
 # here with the same defaults. Only [data].Datasets is required; every other value shown is the default, except
-# [data].TrainingDatasets, [groups] and [display_names] (default: empty).
+# [data].TrainingDatasets, [groups] and [display_names] (default: empty) and [classes] (default: SNGP metadata).
 
 [general]
 RunName   = "test_turb_allcases"             # File-name stem of the figures: <RunName>_<figure>[_log].<fmt>
@@ -22,6 +23,12 @@ GpuNum    = 0                                # GPU index for torch and TensorFlo
 Baseline = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 Sngp     = "sngp/sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged"
 Error    = "error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811"
+
+[classes]
+# Post-hoc grouping (class labels of the input-space class figures only; the confidence always uses the un-merged
+# SNGP classes) and display names. Without these keys the SNGP metadata is used (the reference SNGPs store none), e.g.
+# PosthocGroups = { "APG TBL" = ["APG", "Curved BL APG"], "FPG TBL" = ["FPG", "NASA Hump FPG", "Curved BL FPG"], "Separation" = ["SEP", "NASA Hump SEP"] }
+# DisplayNames  = { CH = "ZPG TBL", FS_ZPG = "Viscous ZPG", FS_APG = "Viscous APG", FS_FPG = "Viscous FPG", transition_JHU_transition = "Transition BL" }
 
 [data]
 # Evaluated dataset keys (wall_model_cases.py registry, ./data/<key>_data.h5, or [data.Files]); one case each,
@@ -154,3 +161,25 @@ PdfConfRange  = [0.7, 1.0]       # Range of the confidence PDF
 PdfBins       = 50               # Histogram bins
 PdfCurves     = ["baseline", "final"]   # Error-PDF curves: "baseline", "final" (blended), optional "eqwm", "always"
 PdfSubset     = "all"            # Points pooled into the PDFs: "all", or those of the "train" or "test" (untrained) cases only
+
+[plots.input_space]
+# Predictions over the network-input planes pi_1-pi_2 and pi_1-pi_3 (pi_1 = u1 n1/nu, pi_2 = up n1/nu, pi_3 = u2 n1/nu),
+# one figure per set, metric and axis scale with both planes side by side, in <OutputDir>/input_space/:
+# <RunName>_<train|test>_<metric>_<symlog|linear>.<fmt>. Points: those of the statistics (after the domain filter);
+# "train" = the TrainingDatasets, "test" = all other datasets.
+Sets    = "both"                 # "train", "test", "both" or "none"; --input-space overrides
+Metrics = ["sigma", "sigma_pct", "mu", "mu_pct", "confidence", "class"]
+                                 # sigma / mu: predicted aleatoric / epistemic error (pi_out units; |mu| plotted);
+                                 # *_pct: in % of |pi_out,baseline| ([gates.LowValue] blend); confidence: C;
+                                 # class: predicted post-hoc class, C < [gates.Confidence].Threshold drawn as "OOD"
+TrainingBackground = false       # true: draw the training datasets in black behind the test datasets; --[no-]training-background overrides
+BackgroundAlpha    = 0.1         # Opacity of the background points
+Scale     = "symlog"             # Axes: "symlog" (logarithmic in |pi|, linear within +-LinThresh), "linear" or "both"
+LinThresh = 1.0                  # Linear range of the symlog axes
+LinearLimits = { Pi1 = [-5000.0, 20000.0], Pi2 = [-200.0, 200.0], Pi3 = [-5000.0, 20000.0] }   # Linear axis limits
+SymlogLimits = { Pi1 = [], Pi2 = [], Pi3 = [] }   # Symlog axis limits ([] = data range)
+MarkerSize      = 1.0            # Scatter marker size
+PercentRange    = [1.0, 100.0]   # Logarithmic colour range of sigma% and |mu|%
+SigmaRange      = []             # Logarithmic colour range of sigma ([] = 1st-99th percentile of the plotted points)
+MuRange         = []             # Logarithmic colour range of |mu| ([] = 1st-99th percentile)
+ConfidenceRange = [0.0, 1.0]     # Colour range of C

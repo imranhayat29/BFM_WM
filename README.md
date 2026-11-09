@@ -157,6 +157,8 @@ python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml [-
 python train_lamturb.py --sngp sngp/sngp_lamturb.toml --error error/error_lamturb.toml [--branch lam] [--gpu N]
 # login-node smoke test: 2 epochs, capped samples, saved under results/smoke/
 python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --gpu -1 --smoke
+# input-space figures of already trained models, without training
+python train_turb.py --error error/error_turb.toml --plots-only
 ```
 
 - Either `--sngp` or `--error` may be given alone. `--gpu` overrides `[general] GpuNum` (`-1` = CPU).
@@ -176,6 +178,17 @@ python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --
     `training_history.json`, `val_loss.csv` and `split_indices.npz`. Periodic snapshots go to
     `<SaveDir>/checkpoints/<ModelName>/`.
 - Diagnostics (confusion matrices, class counts, training histories) go to `results/training/<ModelName>/`.
+- **Input-space figures** (`[plots.input_space]` of the training TOMLs) go to
+  `results/training/<ModelName>/input_space/<train|valid>_<metric>_<symlog|linear>.png`: the model's predictions
+  over the network-input planes $\pi_1$–$\pi_2$ and $\pi_1$–$\pi_3$ of its train and validation splits (the points
+  it was trained and validated on), both planes side by side in one figure. Error model: $\sigma$, σ%, $|\mu|$ and
+  $|\mu|$% (percentages of $|\pi_{out,baseline}|$ as in the test scripts); SNGP: confidence $C$ and the predicted
+  class after the post-hoc grouping, with $C$ below `OodThreshold` (0.7) drawn as `OOD`. The keys are those of the
+  all-cases test ([section 4](#4-a-priori-test-on-all-cases)), with `Sets = "train" | "valid" | "both" | "none"`;
+  `TrainingBackground = true` draws the train split in black behind the validation split.
+- `--plots-only` trains nothing: it rebuilds the train/valid data from the TOMLs, checks them against the
+  `split_indices.npz` saved with each model (`<SaveDir>/<ModelName>`) and writes only the input-space figures of the
+  saved models, e.g. for models trained before these figures existed.
 - The error model keeps the weights of its best validation epoch, or with `SmoothEpochs` > 0 those of the epoch
   with the lowest moving average of the validation loss. The reference turbulent error model
   `…_ep3811` is the best epoch of a 10000-epoch run.
@@ -230,6 +243,7 @@ python test_turb_allcases.py test/test_turb_allcases.toml --dry-run      # only 
 python test_turb_allcases.py test/test_turb_allcases.toml --gpu -1 \
     --datasets CH TBL_5 "Gaussian bump 2M" --max-samples 3000 --output-dir results/smoke/test_turb_allcases
 python test_turb_allcases.py --replot results/smoke/test_turb_allcases --scale log   # figures only, no torch/TF
+python test_turb_allcases.py --replot results/test_turb_allcases --input-space test --training-background
 ```
 
 | Option | Meaning |
@@ -240,6 +254,8 @@ python test_turb_allcases.py --replot results/smoke/test_turb_allcases --scale l
 | `--max-samples N` | per-dataset deterministic sample cap, applied after the domain filter (0 = all); overrides `[data].MaxSamplesPerDataset` |
 | `--datasets k1 k2 ...` | evaluate only these keys; a `[groups]` name expands to its members, and a group is pooled from the members selected |
 | `--scale linear\|log\|both` | scatter axes; overrides `[plots].Scale` |
+| `--input-space train\|test\|both\|none` | input-space figures of the training datasets, the test datasets, both or none; overrides `[plots.input_space].Sets` |
+| `--training-background`, `--no-training-background` | draw the training datasets in black behind the test-dataset input-space figures, or not; overrides `[plots.input_space].TrainingBackground` |
 | `--replot RUN_DIR` | regenerate every figure from `RUN_DIR/cases.csv` + `points.npz`, without torch, TensorFlow or inference; plot options from the given TOML, else from `RUN_DIR/overall.json` |
 | `--dry-run` | validate the TOML and resolve every dataset and model file, then exit (no models loaded) |
 
@@ -288,7 +304,7 @@ datasets listed in `[data].Datasets` are evaluated.
 | --- | --- |
 | `cases.csv` | one row per dataset, group member, group and skipped dataset (column `kind`), with the statistics above and the fraction of points whose stored network input is inconsistent with $u_1 n_1/\nu$ (a data check) |
 | `overall.json` | resolved configuration, command line, model paths, git commit, package versions, overall averages, skipped datasets, timings |
-| `points.npz` | float32 per-point errors, σ%, $C$, switch weights and $\pi_{out}$ values; `dataset`/`case` indices into `dataset_keys`/`case_names`; the `training` and `used` masks |
+| `points.npz` | float32 per-point errors, $\sigma$, σ%, $\mu$, $\mu$%, $C$, switch weights, $\pi_{out}$ values and network inputs `pi1`-`pi3`; the predicted post-hoc class `label` (index into `class_names`); `dataset`/`case` indices into `dataset_keys`/`case_names`; the `training` and `used` masks |
 | console | a summary table of the mean \|e%\| per case with the overall averages, and a table of the points removed by the domain filter per dataset |
 
 Figures are named `<RunName>_<figure>[_log].<fmt>` (default `RunName` = `test_turb_allcases`; `[plots].Figures`
@@ -302,6 +318,23 @@ selects them, `Formats` sets the formats):
 | `confidence` | the scatter coloured by the mean confidence $C$ of each case (`ConfidenceColorRange`) |
 | `pdf`, `pdf_confidence` | PDFs of \|e%\| and of $C$, pooled over the used points; curves from `PdfCurves`, points from `PdfSubset`; kernel density estimates are fitted inside the plotted range, so the densities are conditional on that range |
 | `pdf_always_vs_blended` | \|e%\| PDFs of the baseline, the always-corrected and the blended predictions (needs `CompareAlways = true`) |
+
+**Input-space figures** (`[plots.input_space]`), written to `<OutputDir>/input_space/` as
+`<RunName>_<train|test>_<metric>_<symlog|linear>.<fmt>`: the predictions at every used point over the network-input
+planes $\pi_1$–$\pi_2$ (left) and $\pi_1$–$\pi_3$ (right), with $\pi_1 = u_1 n_1/\nu$, $\pi_2 = u_p n_1/\nu$ and
+$\pi_3 = u_2 n_1/\nu$. `train` shows the points of the `TrainingDatasets`, `test` those of all other datasets.
+
+| Key (default) | Meaning |
+| --- | --- |
+| `Sets` (`"both"`) | `"train"`, `"test"`, `"both"` or `"none"` (`--input-space`) |
+| `Metrics` (all) | `sigma`, `sigma_pct`: predicted aleatoric error $\sigma$ (in $\pi_{out}$ units) and σ% (of $\lvert\pi_{out,baseline}\rvert$, with the `[gates].LowValue` blend); `mu`, `mu_pct`: predicted epistemic error (correction) $\lvert\mu\rvert$ and $\lvert\mu\rvert$%; `confidence`: $C$; `class`: predicted class after the post-hoc grouping of `[classes]` (default: the SNGP metadata), with $C$ < `[gates].Confidence.Threshold` drawn as `OOD` in dark grey |
+| `TrainingBackground` (`false`) | draw the training datasets in black behind the test datasets (`--[no-]training-background`); `BackgroundAlpha` (`0.1`) sets their opacity |
+| `Scale` (`"symlog"`) | `"symlog"` (logarithmic in $\lvert\pi\rvert$, linear within ±`LinThresh` (`1`)), `"linear"` or `"both"` |
+| `LinearLimits`, `SymlogLimits` | axis limits per input, e.g. `{ Pi1 = [-5000.0, 20000.0], Pi2 = [-200.0, 200.0], Pi3 = [-5000.0, 20000.0] }` (the linear default); `[]` = data range (the symlog default) |
+| `PercentRange` (`[1, 100]`), `SigmaRange`, `MuRange` (`[]` = 1st–99th percentile), `ConfidenceRange` (`[0, 1]`) | colour ranges; logarithmic for $\sigma$, $\lvert\mu\rvert$ and the percentages |
+| `MarkerSize` (`1`) | marker size |
+
+Points are drawn in a fixed random order, so that no dataset hides another, and the scatter layers are rasterized.
 
 ### 5. Export to CharLES BFMv2
 
@@ -400,6 +433,7 @@ shared top-level `[general]` table are inherited by the branches that do not set
 | `[training]`, SNGP | `Epochs` (required), `BatchSize` (`50000`), `LearningRate` (`5e-4`) linearly to `EndLearningRate` (`1e-4`), `DecayUnit` (`"epoch"`), `ClassWeights` (`"balanced"` or `"none"`) |
 | `[model]`, error model | `HiddenLayers` (required, e.g. 15 × 60), `SigmaFloor` (`1e-4`) |
 | `[training]`, error model | `Epochs` (required), `BatchSize` (`50000`), `LearningRate` (`1e-3`) linearly to `EndLearningRate` (`8e-5`) over the first `DecayFraction` (`2/3`) of the epochs; `[training.EarlyStopping]` `RestoreBestWeights` (`true`), `Patience` (`0` = never stop early), `MinDelta` (`0.0`), `SmoothEpochs` (`0`; > 0: select the epoch on the exponential moving average of `val_loss` over that many epochs); `[training.Snapshots]` `SaveInterval` (`1000`; `0` = off) |
+| `[plots.input_space]` | input-space diagnostics (see [section 2](#2-sngp-confidence-model-and-error-model)): `Sets` (`"both"`: `"train"`, `"valid"`, `"both"`, `"none"`), `Metrics` (SNGP `["confidence", "class"]`, error model `["sigma", "sigma_pct", "mu", "mu_pct"]`), `TrainingBackground` (`false`), `Scale` (`"symlog"`), axis limits and colour ranges as in the all-cases test; SNGP: `OodThreshold` (`0.7`); error model: `LowValue` (`2` ± `1`) of the percentages |
 
 Two SNGP options select between the current training and the one of the reference SNGPs:
 - `DecayUnit = "epoch"` decays the learning rate over all epochs; `"step"` counts optimiser steps instead,

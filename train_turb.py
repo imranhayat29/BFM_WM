@@ -5,7 +5,7 @@ The baseline wall model itself is trained with train_wm_proposal.py; this script
 ([baseline] Checkpoint) as input.
 
 Usage (from the repository root):
-    python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml [--gpu N] [--smoke]
+    python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml [--gpu N] [--smoke] [--plots-only]
 
     --sngp / --error   TOML files resolved under ./inputfiles/ (or ./inputfiles/sngp|error/, or as a path);
                        at least one is required. With both, the baseline checkpoints must be equal; the
@@ -13,8 +13,12 @@ Usage (from the repository root):
     --gpu N            GPU index for torch and TensorFlow (overrides [general] GpuNum; -1 = CPU)
     --smoke            login-node smoke test: 2 epochs, capped samples, models saved to
                        ./results/smoke/models/ (Overwrite allowed), diagnostics to ./results/smoke/training/
+    --plots-only       train nothing: rebuild the training data from the TOMLs (checked against the split saved
+                       with each model) and write only the input-space figures of the saved models
 
-Outputs: <SaveDir>/<ModelName> (SavedModel + assets/), diagnostics in results/training/<ModelName>/.
+Outputs: <SaveDir>/<ModelName> (SavedModel + assets/), diagnostics in results/training/<ModelName>/ (training
+curves, SNGP confusion matrices and class counts, and in input_space/ the predictions over the input planes
+pi_1-pi_2 and pi_1-pi_3 of the train and validation splits; [plots.input_space] of the TOMLs).
 """
 # Provenance: replaces the training cells of TURB-NB (SNGP: cells 14-24, error model: cells 30-35);
 # see docs/DEVELOPMENT.md.
@@ -35,7 +39,7 @@ def main(argv=None) -> int:
     except (ValueError, FileNotFoundError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
-    if not args.smoke:
+    if not args.smoke and not args.plots_only:
         from src_err.training import check_outputs
         try:
             check_outputs(sngp_cfg, "sngp")
@@ -44,14 +48,15 @@ def main(argv=None) -> int:
             print(f"ERROR: {exc}", file=sys.stderr)
             return 3
     gpu = select_gpu(args, (sngp_cfg, error_cfg))
-    print_summary(sngp_cfg, error_cfg, gpu, args.smoke, "train_turb.py: turbulent-only SNGP / error model")
+    print_summary(sngp_cfg, error_cfg, gpu, args.smoke, "train_turb.py: turbulent-only SNGP / error model",
+                  plots_only=args.plots_only)
 
     device = utils.configure_devices(gpu)
     from src_err.training import run_branch  # imports TensorFlow (after the device set-up)
 
     try:
-        run_branch(sngp_cfg, error_cfg, device, smoke=args.smoke, branch_label="turb")
-    except FileExistsError as exc:
+        run_branch(sngp_cfg, error_cfg, device, smoke=args.smoke, branch_label="turb", plots_only=args.plots_only)
+    except (FileExistsError, FileNotFoundError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 3
     return 0

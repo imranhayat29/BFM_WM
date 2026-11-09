@@ -205,6 +205,9 @@ python test_lamturb.py test/test_lamturb.toml [--gpu N] [--output-dir DIR] [--ma
 - `--show-cf-stations` marks the n1 stations of the $|C_f|$ line plots in red on the maps. It sets `ShowSelected`
   in `[plots.tripcolor]` and `[plots.maps]`, which are off by default.
 - As in training, the TOML, every test dataset file and every model are checked before the models are loaded.
+- The networks get their inputs in the frame in which CharLES BFMv2 gives them (`[data] InputFrame = "u2"`, the
+  default; see [To do](#to-do)): at points with $u_2 < 0$ all three inputs change sign. `InputFrame = "global"`
+  keeps the datasets' global-x frame, the frame of the training data. `test_turb_allcases.py` has the same key.
 
 The output directory (`[general] OutputDir`) receives:
 - smoothed tripcolor maps of the errors, σ, confidence and class labels, with the OOD and near-wall-fallback
@@ -453,7 +456,7 @@ turbulent-only / lam-turb.
 | `[general]` | `OutputDir` (`results/test_turb_gaussian_2M` / `results/test_lamturb`), `Formats` (`["png", "pdf"]`), `GpuNum` (`0`), `SaveArrays` (`false`) |
 | `[models]` | `Baseline`, `Sngp`, `Error`: path relative to `./models` (e.g. `sngp/<name>`) or any path (default: the reference models of the branch) |
 | `[classes]` | `PosthocGroups`, `DisplayNames` (default: those stored in the SNGP metadata) |
-| `[data]` | `Datasets`, `upy` (`0.15` / `1.0`), `downy` (`0.0`), `Stride` (`2`: every 2nd point), `MaxSamples` (`0` = all), `Files` |
+| `[data]` | `Datasets`, `upy` (`0.15` / `1.0`), `downy` (`0.0`), `Stride` (`2`: every 2nd point), `MaxSamples` (`0` = all), `InputFrame` (`"u2"`: the CharLES input frame; `"global"`: the datasets' frame), `Files` |
 | `[eqwm]` | `Law`: `"charles"` (default, CharLES BFMv2 two-layer law) or `"parent"` (upstream's `src/baseline_models.log_law_solve`: log law, re-solved with a cubic near-wall layer below $y^+ = 23$) |
 | `[confidence]` | `Covariance`: `"none"` (default, $v = 1$ as in CharLES) or `"gp"` (per-point GP variance) |
 | `[gates]` | `Aleatoric` (`Type = "percentage"`, threshold `10` / `15` ± `5`; `Type = "ratio"` defaults to `1.0` ± `0.5`), `Confidence` (`0.7` ± `0.05` / `0.85` ± `0.1`), `Yplus` (`4` ± `2`), `LowValue` (`2` ± `1`) |
@@ -569,12 +572,13 @@ installation is needed for them. The scripts of this repository do not need LaTe
 
 - **Input sign frame.** CharLES BFMv2 (GFIX_v3) gives the networks inputs in a local u2-positive frame:
   sign($\pi_1$) = sign($u_1 \cdot u_2$), $\pi_3 = |u_2|\, n_1/\nu$, and the pressure gradient is projected on the $u_2$
-  direction. The training data (and therefore this repository's a-priori tests) use the datasets' global-x
-  frame. On reversed-flow points the two frames give different inputs: the current networks are much less
-  accurate in the CharLES frame (e.g. gaussian_2M_SEP, where $u_2 < 0$ on 72 % of the points: baseline mean
-  |e| 7.5 % in the dataset frame vs 17.8 % in the CharLES frame).
-  - Plan: regenerate the training data in the u2-positive frame (data-generation repository) and retrain all
-    models.
+  direction. The models are trained in the datasets' global-x frame; the test scripts evaluate them in the
+  CharLES frame by default (`[data] InputFrame`). On reversed-flow points the two frames give different inputs,
+  and the networks are much less accurate in the CharLES frame (e.g. gaussian_2M_SEP, where $u_2 < 0$ on 72 % of
+  the points: reference baseline mean |e| 7.5 % in the dataset frame vs 17.8 % in the CharLES frame).
+  - Open: more accurate predictions on reversed flow in the CharLES frame. Training on data converted to the
+    u2-positive frame was tried; it fixed the reversed-flow points but was less accurate on the flows it was not
+    trained on, so the main branch (`v2`) keeps the training data in the global frame.
   - Why this frame: a wall model in a real application does not always know the global flow direction, so
     reversal cannot be defined relative to it. Taking $u_2$ as the local reference decides whether the flow is
     locally reversed and which way the pressure gradient points. It also gives the desired symmetry: if $u_1$

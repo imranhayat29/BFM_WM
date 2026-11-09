@@ -633,8 +633,8 @@ changes on their next run. Nothing was run after these commits.
 ### 9.3 Remaining difference: the input sign frame
 
 CharLES BFMv2 (GFIX_v3) builds the network inputs in a local u2-positive frame: sign(π1) = sign(u1·u2),
-π3 = |u2| n1/ν, dp/ds projected on the u2 direction. The datasets (and therefore training and every a-priori test) use
-the global-x frame. For a point with u2 < 0 CharLES feeds (|π1|, −π2, |π3|) where v2 feeds (π1, π2, π3), and the
+π3 = |u2| n1/ν, dp/ds projected on the u2 direction. The datasets (and therefore training) use the global-x frame;
+since 2026-11-08 the a-priori tests feed the networks the CharLES frame (below). For a point with u2 < 0 CharLES feeds (|π1|, −π2, |π3|) where v2 feeds (π1, π2, π3), and the
 networks are not reflection-symmetric. Measured with the reference models (n1/δ <= 0.15, stride 2, points with
 π3 < 0):
 
@@ -643,14 +643,23 @@ networks are not reflection-symmetric. Measured with the reference models (n1/δ
 | gaussian_2M_SEP | 72 % (9086/12596) | 7.5 % → 17.8 % (median 4.2 → 14.2) | 5.0 % → 22.6 % | 1.000 → 0.992 |
 | hump_APG_SEP2 | 92 % (131/143) | 11.0 % → 23.2 % | 11.7 % → 40.7 % | 0.993 → 0.927 |
 
-Plan (owner, README To do): regenerate the training data in the u2-positive frame (WM_data_creation) and retrain all
-models. Rationale: a deployed wall model does not know the global flow direction, so reversal cannot be defined
+History: the owner's plan was to regenerate the training data in the u2-positive frame (WM_data_creation) and retrain
+all models. Rationale: a deployed wall model does not know the global flow direction, so reversal cannot be defined
 relative to it; u2 is the local reference that decides whether the flow is locally reversed and which way the pressure
 gradient points, and it gives the symmetry that a prediction (a magnitude) must not depend on whether the local flow
 runs forward or backward when u1 and u2 point the same way. The sign of τ_w is assigned afterwards from the global
-direction of u1. An inference-only `InputFrame` option was considered and rejected (it only makes the current models
-worse on reversed flow). Notes for an implementation: keep |π1| frame-invariant; only InputScaling 2 is covered; with
-`near_wall_threshold > 0` the inputs are sign·log1p(|x|); CharLES deadbands and time filtering are not reproduced.
+direction of u1. The retraining was done in November 2026 (all models except the laminar baseline, branch `u2f`):
+the retrained models fix the reversed-flow points but are less accurate than the reference models on untrained flows,
+and so is a global-frame control retrained the same way, so the gap comes from the retraining, not from the frame.
+
+Decision (2026-11-08): train in the global frame, evaluate in the CharLES frame. The test scripts' `[data] InputFrame`
+(default `"u2"`; `src_err/data.to_input_frame`) mirrors all three inputs, and u1, where π3 < 0. It had been
+considered and rejected before because it only makes the current models look worse on reversed flow; it is used now
+because these are the inputs the networks get in CharLES. Implementation notes: |π1| is frame-invariant; only
+InputScaling 2 (exactly three inputs); the near-wall inputs sign·log1p(|x|) are odd, so the mirror applies to them
+too; CharLES deadbands and time filtering are not reproduced. Check: with the reference models, `InputFrame = "u2"` on
+the global-frame data gives per-point results bit-identical to `"global"` on the converted data (`test_turb`, Gaussian
+bump 2M, 41 616 points; `test_lamturb`, A-airfoil full field, 60 000 points).
 
 ---
 

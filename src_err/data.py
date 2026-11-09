@@ -12,7 +12,7 @@ y (N,) = pi_out = u_tau*n1/nu (>= 0), U (N,4) = [n1, u1, nu, u_tau].
 """
 import os
 import pickle
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
@@ -410,6 +410,40 @@ def load_datasets(keys: Sequence[str], model_config: Dict[str, Any], upy: float,
         out = out.subset(idx)
     print(f"Loaded {len(keys)} dataset(s): {len(out)} points (stride {stride})")
     return out
+
+
+def to_input_frame(arrays: DatasetArrays, frame: str) -> DatasetArrays:
+    """
+    Network inputs in the sign frame of the test ([data] InputFrame of the test TOMLs)
+
+    'global' keeps the datasets' global-x frame. 'u2' gives the inputs of CharLES BFMv2 (GFIX_v3), the
+    local u2-positive frame: sign(pi1) = sign(u1 u2), pi3 = |u2| n1/nu and the pressure gradient
+    projected on the u2 direction. In the global frame these are the inputs with all signs flipped
+    where u2 < 0 (pi3 < 0); u1 in U flips with them, so pi1 = u1 n1/nu still holds. The targets
+    are magnitudes and do not change. On data already in the u2 frame (no pi3 < 0) 'u2' changes nothing.
+    The near-wall inputs sign(x) log1p(|x|) are odd in x, so the mirror applies to them as well.
+
+    Args:
+        arrays: DatasetArrays with InputScaling-2 inputs [pi1, pi2, pi3]
+        frame: 'global' or 'u2'
+
+    Returns:
+        DatasetArrays (the same object for 'global' or when no point has pi3 < 0)
+    """
+    if frame == "global":
+        return arrays
+    if frame != "u2":
+        raise ValueError(f"Unknown input frame {frame!r} (expected 'global' or 'u2')")
+    if arrays.X.shape[1] != 3:
+        raise ValueError("InputFrame 'u2' needs exactly the inputs [pi1, pi2, pi3] (InputScaling 2)")
+    flip = arrays.X[:, 2] < 0
+    print(f"Input frame u2: {int(flip.sum())} of {len(arrays)} points mirrored (pi3 < 0)")
+    if not flip.any():
+        return arrays
+    X, U = arrays.X.copy(), arrays.U.copy()
+    X[flip] = -X[flip]
+    U[flip, 1] = -U[flip, 1]
+    return replace(arrays, X=X, U=U)
 
 
 def split_extra(arrays: DatasetArrays, train_ratio: float, seed: int) -> ExtraSplit:

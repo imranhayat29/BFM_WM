@@ -31,7 +31,7 @@ def main(argv=None) -> None:
     except (ValueError, FileNotFoundError) as exc:
         sys.exit(f"ERROR: {exc}")
     apply_plot_flags(args, cfg)
-    from src_err.data import load_datasets
+    from src_err.data import load_datasets, to_input_frame
     from src_err.pipeline import class_names_for_plot, load_branch_models, predict_turb
     from src_err.reporting import build_test_summary, make_test_figures, print_test_config, save_test_outputs
 
@@ -51,6 +51,7 @@ def main(argv=None) -> None:
     print("=" * 80)
     arrays = load_datasets(d["Datasets"], models.baseline.config, d["upy"], d["downy"],
                            files_override=d["Files"], stride=d["Stride"], max_samples=max_samples)
+    arrays = to_input_frame(arrays, d["InputFrame"])
     timings["load_data"] = time.time() - t
 
     t = time.time()

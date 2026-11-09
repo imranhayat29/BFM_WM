@@ -51,6 +51,9 @@ upy        = 1.0     # Keep n1/delta <= upy (>= 1: no upper cut, i.e. the full p
 downy      = 0.0     # Keep n1/delta >= downy (0: no lower cut; honoured even when upy >= 1)
 Stride     = 2       # Keep every Stride-th point of each dataset (1 = all points)
 MaxSamples = 0       # > 0: deterministic evenly spaced subsample of all points (smoke tests); --max-samples overrides
+# Sign frame of the network inputs: "u2" = the local u2-positive frame in which CharLES BFMv2 gives the networks
+# their inputs (all three inputs mirrored where u2 < 0); "global" = the datasets' global-x frame
+InputFrame = "u2"
 
 [data.Files]
 # Optional explicit h5 path per dataset key (absolute, or relative to the repository root, where the scripts run),

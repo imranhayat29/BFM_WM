@@ -524,7 +524,7 @@ def run_dataset(key: str, models: Any, cfg: Mapping[str, Any], max_samples: int)
         Record: status ('ok' / 'skipped'), reason, n_raw/n_domain/n_eval, points (float32
         per-point fields), used (evaluation mask), input_inconsistent_frac, time
     """
-    from src_err.data import load_datasets
+    from src_err.data import load_datasets, to_input_frame
     from src_err.pipeline import input_consistency, predict_turb
 
     d = cfg["data"]
@@ -533,6 +533,7 @@ def run_dataset(key: str, models: Any, cfg: Mapping[str, Any], max_samples: int)
     try:
         arrays = load_datasets([key], models.baseline.config, d["upy"], d["downy"], files_override=d["Files"],
                                stride=d["Stride"], max_samples=0)
+        arrays = to_input_frame(arrays, d["InputFrame"])
         rec["n_raw"] = len(arrays)
         if len(arrays) == 0:
             rec["reason"] = "no points in the n1/delta window"

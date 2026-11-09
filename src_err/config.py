@@ -326,6 +326,7 @@ def test_schema(variant: str) -> Dict[str, Any]:
             "Stride": Key("int", 2, check=_positive),
             "MaxSamples": Key("int", 0, check=_non_negative),
             "Files": Key("map[str]", {}),
+            "InputFrame": Key("str", "u2", enum=["u2", "global"]),  # u2 = the CharLES input frame (data.to_input_frame)
         },
         "eqwm": {"Law": Key("str", "charles", enum=["charles", "parent"])},
         "confidence": {"Covariance": Key("str", "none", enum=["none", "gp"])},
@@ -411,6 +412,7 @@ def benchmark_schema() -> Dict[str, Any]:
             "Stride": Key("int", 1, check=_positive),
             "MaxSamplesPerDataset": Key("int", 0, check=_non_negative),
             "Files": Key("map[str]", {}),
+            "InputFrame": Key("str", "u2", enum=["u2", "global"]),  # u2 = the CharLES input frame (data.to_input_frame)
         },
         "groups": Key("map[list[str]]", {}),
         "display_names": Key("map[str]", {}),

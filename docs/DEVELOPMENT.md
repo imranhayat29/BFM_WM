@@ -336,7 +336,7 @@ below, about 930 MB pulled from upstream). Differences from upstream:
 
 | File | Source | Change | Why |
 |---|---|---|---|
-| `FS_{ZPG,APG,FPG}_data.h5` | fork's local, uncommitted versions | replaced; about 5x more points (`FS_ZPG`: 1.94 MB → 9.32 MB) | the versions both reference baselines were trained on; FS_* are classes of the turbulent SNGP and part of the turbulent error-model data too |
+| `FS_{ZPG,APG,FPG}_data.h5` | fork's local, uncommitted versions (dated 2026-04-13) | replaced; about 5x more points (`FS_ZPG`: 1.94 MB → 9.32 MB) | the versions the laminar reference baseline was trained on; FS_* are classes of the turbulent SNGP and part of the turbulent error-model data too. The turbulent reference baseline was trained on older upstream files ([5.3](#53-training-data-of-the-turbulent-reference-baseline)) |
 | `curved_TBL_{APG,FPG}_data.h5` | fork's local versions | replaced; numerically identical, case names `curved_BL_APG`/`curved_BL_FPG` instead of `curved_BL` | the SNGP needs two distinct classes |
 | `aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_{ZPG,APG,FPG}.h5` | fork, untracked | added | additional data of the laminar SNGP (n1/δ 0.02-0.8, `kt_km` column) |
 | `aairfoil_2M_full2Dfield_down0p005_up1_laminar_{ZPG,APG,FPG}.h5` | fork, untracked (dated 2026-04-14) | added (review decision, 2026-10-25) | additional data of the laminar error model (n1/δ 0.005-1); the reference "UPY1" model's statistics match them |
@@ -376,6 +376,39 @@ from before that date were computed with the filtered file: the numbers in [12.2
 always-corrected errors in [10.1](#101-negative-raw-baseline-outputs). Statistics of the inputs are the same for both
 files (the raw < 0 counts in 10.1, the u2 < 0 fraction in [10.2](#102-input-frame)).
 
+### 5.3 Training data of the turbulent reference baseline
+
+`cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth` was trained upstream in early December 2025 (config dated 12/04,
+file named 20251208, copied into the fork on 2025-12-09), during a series of upstream data fixes. Its embedded config
+matches `baseline/baseline_turb.toml` (n1/δ window 0.0025-0.15) except for the seed, but **at least its three FS
+training files were older versions than those in `data/`**. Of its 18 training files, 11 are the same in `data/` as
+in upstream's state of 2025-12-05 to 12-08 (commit `a856dc6`); the other seven changed right after:
+
+| Files | Upstream state then | `data/` | Evidence |
+|---|---|---|---|
+| `FS_{ZPG,APG,FPG}_data.h5` | 1 700 / 16 700 / 19 700 rows, n1/δ99 0.010-0.25, thickness column named `delta99`. The training loader filters the n1/δ window only with a `delta` column; here it printed "Cannot filter by 'upy'" and kept all 38 100 rows. Renamed upstream on 2025-12-09 (`f31a438`, "Correct delta in columns") | fork files, n1/δ 0-1.25; the window keeps 4 000 / 30 400 / 46 000 points (80 400; 8.8 % of the 910 904 training points) | strong: baselines retrained on `data/` (three seeds, 2026-11) fit the old files 1.6-3.4x worse than the current ones (mean \|e\| in the window), the reference 0.98-1.37x. On all rows of the old files (as trained), a baseline retrained on them (ablation below) has mean \|e\| 1.9 / 6.1 / 4.7 %, the reference 3.8 / 7.5 / 5.2 %, the baselines retrained on `data/` 8.4-9.5 / 19-38 / 7.5-8.9 % |
+| `gaussian_2M_data_{MAPG,APG,FPG,SEP}.h5` | version of 2025-12-04 (`a20f23f`): same points, π2 (`up_y_over_nu`, `dpdx`) about 60 % different, same sign | corrected upstream on 2025-12-08 22:54 EST (`78aad75`, "up is corrected") | undetermined; **not the old SEP file**: old / current SEP mean \|e\| is 4.5 / 47.9 % for the ablation baseline (trained on the old files), 16.3 / 7.2 % for the reference and 16-17 / 4.6-5.6 % for the baselines retrained on `data/`. On FPG the reference behaves like the ablation (3.8 / 6.4 % vs 3.1 / 5.8 %; `data/`: 5.2-7.2 / 2.0-3.1 %), on APG in between, and MAPG separates nothing (every model fits the old file better) |
+
+- `CH_data.h5` (π2 set to 0 on 2025-12-05, `a856dc6`) and the TBL files (near-wall points added on 2025-12-04,
+  `a20f23f`): the reference fits the current versions, so it was trained after these updates.
+- The custom loss weights are inverse frequencies per `flow_type` label (11 labels; all TBL files share one), so
+  the three FS labels carry 27 % of the loss weight with either FS version, and the four gaussian labels 36 %.
+- The old files are in upstream's git-lfs history, not in `data/`, so baselines retrained on `data/` are not
+  reproductions of the reference. In the three-seed retraining they fit the training sets more closely but
+  generalise worse to untrained flows (mean baseline \|e\| on the 50 untrained benchmark flows 11.6-12.9 %, reference
+  10.9 %).
+- Ablation (2026-11-03): one baseline retrained (seed 1234, `baseline_turb.toml` recipe) on the old versions of all
+  seven files, the FS files without the window as the loader then did (868 604 training points). It does **not**
+  recover the reference's generalisation: 13.3 % on the untrained flows (12.7 % for seed 1234 on `data/`). It takes
+  on the reference's behaviour where the FS data matter (the five spinning_Driver cases 37.1 %, reference 39.2 %,
+  `data/` 27.9-32.4 %; the five apg_* cases 5.0, 5.6 and 3.6-4.5 %), but is worse on the ten separated untrained
+  flows (23.1 %, reference 12.1 %, `data/` 18.9-20.4 %), consistent with the old SEP file not being the reference's.
+  The data versions therefore do not explain the gap. Open questions for the reference's author: which gaussian
+  files it saw (neither published December version fits all four) and whether it was the best of several runs.
+  Records: git-ignored `results/u2frame/report/dec2025/` (main checkout) and the model `gfc_dec2025` in the
+  `BFM_WM_v2_gfctrl` worktree.
+
+
 ---
 
 ## 6. Reference models
@@ -388,7 +421,7 @@ cannot be reproduced exactly.
 
 | Model | Role | Used by | Recipe / provenance | CharLES |
 |---|---|---|---|---|
-| `cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth` | turbulent baseline (both variants) | TURB-NB, LT-NB turb, EVB | `train_wm_proposal.py` with `input2_1204_v1new_0.15_0.0025.toml` (no longer in the fork; `input2_0.15_0.0025.toml` matches it, now `baseline/baseline_turb.toml`); 20×6, n1/δ 0.0025-0.15, includes FS_*; W&B on | `BFM_wall_data_turb` |
+| `cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth` | turbulent baseline (both variants) | TURB-NB, LT-NB turb, EVB | `train_wm_proposal.py` with `input2_1204_v1new_0.15_0.0025.toml` (no longer in the fork; `input2_0.15_0.0025.toml` matches it, now `baseline/baseline_turb.toml`); 20×6, n1/δ 0.0025-0.15, includes FS_* (December 2025 upstream data, not all of `data/`: [5.3](#53-training-data-of-the-turbulent-reference-baseline)); W&B on | `BFM_wall_data_turb` |
 | `NN_wm_CH0_..._inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth` | laminar baseline | LT-NB lam | `inputfiles/input2_laminar.toml` + `downy 0.005` (now `baseline/baseline_lam.toml`); 40×4, FS_ZPG/APG/FPG, `upy 1.25` (no window); trained on GPU 1 | `BFM_wall_data_lam` |
 | `sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged` | turbulent SNGP, 4000 epochs, K = 50, K_tr = 12, input mean 993.39 | LT-NB turb; default of both v2 test scripts and the benchmark | LT-NB turb pass; recipe = `sngp/sngp_turb.toml` with 4000 epochs, `DecayUnit "step"`, `DropoutActive false` | `BFM_sngp_data_turb` |
 | `sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged` | turbulent SNGP, 5000 epochs | TURB-NB | TURB-NB recipe (`sngp/sngp_turb.toml`, 5000 epochs, legacy quirks) | never exported |

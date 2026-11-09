@@ -12,7 +12,7 @@ SaveDir   = "./models/sngp"   # directory receiving <ModelName>/
 Save      = true         # false: train and write diagnostics only
 Overwrite = false        # true: replace existing model directories
 GpuNum    = 0            # GPU index; -1 = CPU (the CLI option --gpu overrides it)
-Seed      = 1234         # seeds splits, weights, shuffling and dropout
+Seed      = 2345         # seeds splits, weights, shuffling and dropout
 
 # =====================================================================================================
 # Laminar branch: laminar baseline (FS_ZPG/APG/FPG) + laminar A-airfoil additional data
@@ -20,9 +20,11 @@ Seed      = 1234         # seeds splits, weights, shuffling and dropout
 [lam.general]
 # Reference model (./models/sngp/, read-only), for comparison:
 #   sngp_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY0p8_ep20000_merged
-ModelName = "sngp_model_lam_v2"
+ModelName = "sngp_model_lam_gf"
 
 [lam.baseline]
+# The reference laminar baseline; set this to the best-validation checkpoint of the gf laminar baseline
+# (baseline/baseline_lam.toml -> models/baseline/gf_lam/) once it is trained
 Checkpoint = "baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth"
 
 [lam.data]
@@ -31,8 +33,8 @@ AddDatasets = ["aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_ZPG",
                "aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_APG",
                "aairfoil_2M_full2Dfield_down0p02_up0p8_laminar_FPG"]
 TrainRatio = 0.8         # seeded 80/20 split of the additional data
-upy   = 0.8              # n1/delta <= 0.8 (the reference model's 'UPY0p8' tag)
-downy = 0.0              # no lower cut
+upy   = 0.99             # n1/delta <= 0.99 (the window of every laminar model; upy >= 1 would mean no upper cut)
+downy = 0.0025           # n1/delta >= 0.0025
 DownsampleBaseline = 10  # every 10th baseline train/valid point (as for the reference model)
 RecomputeNorm = true     # z-score stats over (strided baseline + additional) train data (as for the reference model)
 
@@ -83,23 +85,25 @@ MarkerSize      = 1.0
 ConfidenceRange = [0.0, 1.0]
 
 # =====================================================================================================
-# Turbulent branch: same recipe as sngp/sngp_turb.toml, 4000 epochs (the SNGP deployed in CharLES BFMv2)
+# Turbulent branch: same recipe as sngp/sngp_turb.toml, 4000 epochs (the recipe of the SNGP deployed in CharLES BFMv2)
 # =====================================================================================================
 [turb.general]
 # Reference model (./models/sngp/, read-only), for comparison:
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged
-ModelName = "sngp_model_lamturb_turb_v2"
+ModelName = "sngp_model_lamturb_turb_gf"
 
 [turb.baseline]
+# The reference turbulent baseline; set this to the best-validation checkpoint of the gf baseline
+# (baseline/baseline_turb.toml -> models/baseline/gf/) once it is trained
 Checkpoint = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 
 [turb.data]
-AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",
+AddDatasets = ["curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",
                "hump_APG_SEP2", "naca_0012", "naca_4412_1", "naca_4412_2", "naca_4412_4", "naca_4412_10",
                "aairfoil_2M"]
 TrainRatio = 0.8
-upy   = 0.15             # n1/delta <= 0.15 (checkpoint upy)
-downy = 0.0
+upy   = 0.15             # n1/delta <= 0.15 (checkpoint upy; the window of every turbulent model: [0.0025, 0.15])
+downy = 0.0025           # n1/delta >= 0.0025 (checkpoint downy)
 DownsampleBaseline = 1   # no stride
 RecomputeNorm = false    # full baseline-train statistics
 
@@ -127,7 +131,6 @@ CH = "ZPG TBL"
 FS_ZPG = "Viscous ZPG"
 FS_APG = "Viscous APG"
 FS_FPG = "Viscous FPG"
-transition_JHU_transition = "Transition BL"
 "APG TBL" = "APG TBL"
 "FPG TBL" = "FPG TBL"
 Separation = "Separation"

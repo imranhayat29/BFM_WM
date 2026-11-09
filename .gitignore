@@ -14,7 +14,7 @@ apost
 # Local developer files (not versioned): e.g. docs/dev_local/inputfiles_annotated, see docs/DEVELOPMENT.md
 docs/dev_local/
 # models/: only the reference models are tracked (git-lfs, models/.gitattributes); models trained locally
-# (e.g. the *_v2 defaults of the training TOMLs) and error-model snapshots are ignored
+# (e.g. the models of the training TOMLs) and error-model snapshots are ignored
 /models/*
 !/models/.gitattributes
 !/models/baseline/

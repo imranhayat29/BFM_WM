@@ -10,16 +10,17 @@
 # All class operations below use class NAMES (validated); the integer labels are derived from them.
 
 [general]
-# Output directory name under SaveDir (required). Reference models (./models/sngp/, read-only), for comparison:
+# Output directory name under SaveDir (required). 'gf' marks the models trained with these settings on the
+# global-frame training data (see error/error_turb.toml). Reference models (./models/sngp/, read-only), for comparison:
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep5000_merged   (this recipe, 5000 epochs)
 #   sngp_model_Baseline_cleanedupNew_Add_ExpertExtFlow_ep4000_merged   (this recipe, 4000 epochs; the turbulent SNGP
 #                                                                       deployed in CharLES BFMv2 and used by the test scripts)
-ModelName = "sngp_model_turb_v2"
+ModelName = "sngp_model_turb_gf"
 SaveDir   = "./models/sngp"   # directory receiving <ModelName>/ (SavedModel + assets/metadata.json, history.json, split_indices.npz)
 Save      = true         # false: train and write diagnostics only
 Overwrite = false        # true: replace an existing <SaveDir>/<ModelName> (otherwise the script stops before training)
 GpuNum    = 0            # GPU index for TensorFlow and torch; -1 = CPU (the CLI option --gpu overrides it)
-Seed      = 1234         # seeds the baseline train/valid split (if the checkpoint stores none), the 80/20 split of the
+Seed      = 2345         # seeds the baseline train/valid split (if the checkpoint stores none), the 80/20 split of the
                          # additional datasets, weight initialisation, shuffling and dropout (required)
 
 [baseline]
@@ -27,19 +28,22 @@ Seed      = 1234         # seeds the baseline train/valid split (if the checkpoi
 # training datasets (= the first SNGP classes, in checkpoint order) and the input scaling.
 # The SNGP/error model see the baseline's own train/valid split: the indices stored in checkpoints trained with
 # this repository, otherwise (e.g. the reference checkpoints) the random split re-drawn with Seed.
+# The reference turbulent baseline; set this to the best-validation checkpoint of the gf baseline
+# (baseline/baseline_turb.toml -> models/baseline/gf/) once it is trained
 Checkpoint = "baseline/cleaned_up_20251208_ymax_0_15_ymin_0_0025.pth"
 
 [data]
 # Additional datasets (registry keys of wall_model_cases.py / ./data/<key>_data.h5), appended as extra classes
 # named by the h5 'case_name' column (e.g. hump_FPG -> 'FPG', aairfoil_2M -> 'airfoil'). [] = baseline data only.
-# The list below is the external-flow set of the reference models ('ExpertExtFlow' in their names):
-AddDatasets = ["Transition_transition", "curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",
+# The list below is the external-flow set of the reference models ('ExpertExtFlow' in their names) without the
+# transitional boundary layer Transition_transition:
+AddDatasets = ["curved_TBL_APG", "curved_TBL_FPG", "hump_FPG", "hump_FPG_SEP",
                "hump_APG_SEP2", "naca_0012", "naca_4412_1", "naca_4412_2", "naca_4412_4", "naca_4412_10",
                "aairfoil_2M"]
 TrainRatio = 0.8         # fraction of the additional-data points in the train part (seeded 80/20 split)
 upy   = 0.15             # upper wall-distance cut n1/delta <= upy for the additional datasets (>= 1: no upper cut);
                          # 0.15 = the upy of the baseline checkpoint
-downy = 0.0              # lower cut n1/delta >= downy (honoured whenever > 0); 0 = no lower cut
+downy = 0.0025           # lower cut n1/delta >= downy (honoured whenever > 0); 0.0025 = the downy of the baseline checkpoint
 DownsampleBaseline = 1   # keep every N-th point of the baseline train/valid part (extras are never strided);
                          # the laminar SNGP (sngp_lamturb.toml) uses 10
 RecomputeNorm = false    # false: z-score with the full baseline-train statistics (turbulent reference models);
@@ -76,7 +80,6 @@ CH = "ZPG TBL"
 FS_ZPG = "Viscous ZPG"
 FS_APG = "Viscous APG"
 FS_FPG = "Viscous FPG"
-transition_JHU_transition = "Transition BL"
 "APG TBL" = "APG TBL"
 "FPG TBL" = "FPG TBL"
 Separation = "Separation"

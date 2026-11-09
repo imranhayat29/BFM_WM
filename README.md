@@ -46,7 +46,7 @@ test_lamturb.py          a-priori test of the blended prediction, laminar-turbul
 test_turb_allcases.py    a-priori test of the turbulent blended prediction on all cases (80 dataset keys)
 inputfiles/
   input2_example.toml    commented example baseline config in upstream's format (see Workflow, step 1)
-  baseline/              baseline configs of the reference checkpoints (baseline_turb, baseline_lam)
+  baseline/              baseline configs (baseline_turb, baseline_lam)
   sngp/                  SNGP training configs (sngp_turb, sngp_lamturb)
   error/                 error-model training configs (error_turb, error_lamturb)
   test/                  test configs (test_turb, test_lamturb, test_turb_allcases)
@@ -55,7 +55,7 @@ src_err/                 error model, SNGP, blended correction, data, metrics, p
 tools/                   CharLES export scripts (see tools/README.md)
 wall_model_cases.py      dataset registry (upstream + additional keys)
 data/                    HDF5 datasets (git-lfs)
-models/                  reference models (git-lfs): baseline/, sngp/, error/ (see Reference models)
+models/                  reference models (git-lfs) and local ones: baseline/, sngp/, error/ (see Models)
 docs/DEVELOPMENT.md      developer notes (see Development notes)
 ```
 
@@ -140,9 +140,9 @@ python train_wm_proposal.py input2_example.toml            # commented example c
 - The config path is relative to `./inputfiles/`.
 - `input2_example.toml` is a commented baseline config in upstream's format (a multi-dataset InputScaling-2
   network). It logs to Weights & Biases (`UseWandb = true`); set it to `false` to run without.
-- `baseline_turb.toml` and `baseline_lam.toml` are the exact configurations embedded in the two reference
-  checkpoints. Only `GpuNum`, `UseWandb`, `SaveDir` (`./models/baseline`) and `Seed` (an optional key added by
-  this repository) differ.
+- `baseline_turb.toml` and `baseline_lam.toml` start from the configurations embedded in the two reference
+  checkpoints. They differ in `GpuNum`, `UseWandb`, `SaveDir`, `Seed` (an optional key added by this repository;
+  2345) and, in `baseline_lam.toml`, the n1/δ window ([0.0025, 0.99]; see [Models](#models-models)).
 - New checkpoints store their train/valid split indices. The SNGP and error-model training reuses them, so
   both see the baseline's actual train/valid split. Checkpoints without stored indices (such as the two
   reference baselines) get a re-split seeded by the training TOML's `Seed`.
@@ -189,8 +189,8 @@ python train_turb.py --error error/error_turb.toml --plots-only
 - `--plots-only` trains nothing: it rebuilds the train/valid data from the TOMLs, checks them against the
   `split_indices.npz` saved with each model (`<SaveDir>/<ModelName>`) and writes only the input-space figures of the
   saved models, e.g. for models trained before these figures existed.
-- The error model keeps the weights of its best validation epoch, or with `SmoothEpochs` > 0 those of the epoch
-  with the lowest moving average of the validation loss. The reference turbulent error model
+- The error model keeps the weights of its best validation epoch, or with `SmoothEpochs` > 0 (default TOMLs: 200)
+  those of the epoch with the lowest moving average of the validation loss. The reference turbulent error model
   `…_ep3811` is the best epoch of a 10000-epoch run.
 
 ### 3. A-priori testing
@@ -289,7 +289,9 @@ datasets listed in `[data].Datasets` are evaluated.
   (maroon); a group is `training` if its name or any member is listed. The default list holds the training sets of
   the turbulent baseline plus the additional training sets of the error model and the SNGP. The JHU transitional
   boundary layer appears twice: `Transition_transition` (its transition region, which the error model and the SNGP
-  were trained on, role `training`) and the full `Transition` case (role `untrained`).
+  of the reference models were trained on, role `training`) and the full `Transition` case (role `untrained`).
+  The training TOMLs no longer add `Transition_transition`, so remove it from `TrainingDatasets` when testing
+  models trained with them.
 - **Per case:** mean, median and P90 of |e%| for the baseline, the blended (final), the always-corrected and the
   EQWM predictions; improvement = mean baseline |e%| − mean final |e%|, and the maximum point-wise improvement; mean
   σ% and mean confidence $C$; the mean switch weights $\alpha_a$, $\alpha_c$, $\alpha_{nw}$; the fractions of points
@@ -461,12 +463,35 @@ turbulent-only / lam-turb.
 
 The gate entries are inline tables, e.g. `Confidence = { Threshold = 0.7, Delta = 0.05 }`.
 
-## Reference models (`models/`, git-lfs)
+## Models (`models/`)
 
-The pretrained reference models are stored with git-lfs in `models/`, in one folder per kind of model:
-`baseline/` (PyTorch checkpoints), `sngp/` and `error/` (TensorFlow SavedModels). `git lfs pull` fetches them
-together with the data. The TOMLs refer to a model by its path relative to `./models` (e.g. `sngp/<name>`) or by
-any other path.
+`models/` holds one folder per kind of model: `baseline/` (PyTorch checkpoints), `sngp/` and `error/` (TensorFlow
+SavedModels). The TOMLs refer to a model by its path relative to `./models` (e.g. `sngp/<name>`) or by any other path.
+
+### gf models (the training TOMLs)
+
+The training TOMLs train the `*_gf` models on the training data in `data/` (the datasets' global-x frame). They have
+not been trained yet; the test TOMLs use the reference models. They differ from the reference recipes in:
+
+- **Windows.** One n1/δ window per branch for every model: [0.0025, 0.15] for the turbulent baseline, SNGP and error
+  model (reference: the additional data of the SNGP and error model from the wall, [0, 0.15]), and [0.0025, 0.99] for
+  the laminar ones (reference: the laminar baseline saw every Falkner-Skan point, n1/δ up to 1.25, and the additional
+  data of the laminar SNGP and error model were not cut). The loaders treat `upy` ≥ 1 as no upper cut, hence 0.99.
+- **Additional turbulent data.** The transitional boundary layer `Transition_transition` is no longer added to the
+  turbulent SNGP and error model (11 datasets instead of 12).
+- **Seed and epoch selection.** `Seed = 2345`, and the error models keep the epoch with the lowest 200-epoch moving
+  average of the validation loss (`SmoothEpochs = 200`).
+- **Baselines.** `baseline/baseline_turb.toml` and `baseline/baseline_lam.toml` save to `models/baseline/gf/` and
+  `models/baseline/gf_lam/`. Until these are trained, the SNGP and error TOMLs use the reference baselines; then set
+  their `[baseline] Checkpoint` (per branch) to the best-validation checkpoints of the gf baselines.
+
+Training stops before it starts if the model exists, so set a new `ModelName` (or `Overwrite = true`) to train another
+one. To test the gf models, set the `[models]` tables of the test TOMLs to them.
+
+### Reference models (git-lfs)
+
+The pretrained reference models are stored with git-lfs; `git lfs pull` fetches them together with the data. They
+were trained on the training data in the datasets' global-x frame and are the models that CharLES BFMv2 runs.
 
 | Model (in `models/`) | Role | Used by default in | In CharLES BFMv2 |
 |---|---|---|---|
@@ -478,22 +503,24 @@ any other path.
 | `error/error_model_Baseline_cleanedupNew_Add_ExpertExtFlow_CustomLayers_N60xL15_wVal_ep3811` | turbulent error model (both variants) | all three test TOMLs | yes |
 | `error/error_model_Baseline_selftrained_lam_Add_ExpertExtFlowUPY1_CustomLayers_N60xL6_wVal_ep4000` | laminar error model | `test_lamturb.toml` | yes |
 
-- The training TOMLs are the recipes of these models: `sngp_turb.toml` (5000 epochs) of the ep5000 SNGP,
-  the `[turb]` branch of `sngp_lamturb.toml` (4000 epochs) of the ep4000 SNGP, `error_turb.toml` and the
-  `[turb]` branch of `error_lamturb.toml` of the turbulent error model, and the `[lam]` branches of the
-  laminar models. With the default `DecayUnit` and `DropoutActive` they train with the current SNGP settings
-  (see [Configuration](#training-tomls-sngp-error)).
+- The training TOMLs started from the recipes of these models: `sngp_turb.toml` (5000 epochs) of the ep5000 SNGP,
+  the `[turb]` branch of `sngp_lamturb.toml` (4000 epochs) of the ep4000 SNGP, `error_turb.toml` and the `[turb]`
+  branch of `error_lamturb.toml` of the turbulent error model, and the `[lam]` branches of the laminar models. They
+  now differ in `ModelName`, `Seed`, `SmoothEpochs` (`0` for these models), the windows and the additional turbulent
+  data ([gf models](#gf-models-the-training-tomls)). With the default `DecayUnit` and `DropoutActive` they train with
+  the current SNGP settings (see [Configuration](#training-tomls-sngp-error)). Models trained with the reference
+  recipes on the reference baselines perform like the reference models (comparison in
+  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), section 12).
 - The reference models were trained without seeds, so their exact splits cannot be reproduced.
 - The laminar error model was trained on the laminar A-airfoil files up to n1/δ = 1 (`down0p005_up1`, the
   "UPY1" in its name), which `error/error_lamturb.toml` uses. The laminar SNGP was trained on the narrower
   `down0p02_up0p8` files (`sngp/sngp_lamturb.toml`).
-- New models are saved next to the reference models of their kind: `train_turb.py`/`train_lamturb.py` to
-  `models/sngp/<ModelName>` and `models/error/<ModelName>` (error-model snapshots in `models/error/checkpoints/`),
-  and `train_wm_proposal.py` to a subfolder per run in `models/baseline/`. Models trained locally are git-ignored;
-  only the reference models are tracked.
-- The training TOMLs default to new names (`*_v2`) so that the reference models are never overwritten. Models
-  trained with them perform like the reference models (comparison in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md),
-  section 12).
+
+### Where new models go
+
+`train_turb.py`/`train_lamturb.py` save to `models/sngp/<ModelName>` and `models/error/<ModelName>` (error-model
+snapshots in `models/error/checkpoints/`), and `train_wm_proposal.py` to a subfolder per run in `models/baseline/`.
+Models trained locally are git-ignored; only the reference models are tracked.
 
 ## Baseline testing tools (upstream)
 

@@ -1,16 +1,19 @@
 # Baseline BFM wall model, laminar branch of the laminar-turbulent workflow.
-# This is the configuration embedded in the reference checkpoint
-# models/baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth.
-# With upy >= 1 the data loader (src/data_handler.py) applies no n1/delta window, so downy has no effect here.
+# These settings train the gf laminar baseline in models/baseline/gf_lam/ (the laminar SNGP and error model are to
+# use its best-validation checkpoint). Apart from Seed and the n1/delta window [0.0025, 0.99] they are the
+# configuration embedded in the reference checkpoint
+# models/baseline/NN_wm_CH0_G0_S0_tn560665_vn140167_fds0_lds0_customw1_inputs2_final_ep30000_tl0.00032144_vl0.00031670.pth,
+# which was trained with upy = 1.25: the data loader (src/data_handler.py) applies the window only for upy < 1, so
+# that model saw every Falkner-Skan point (n1/delta up to 1.25).
 # Train with:  python train_wm_proposal.py baseline/baseline_lam.toml
 
 [general]
 Verbose = 1
 UseWandb = false   # Weights & Biases tracking (the reference checkpoint used false)
 Save = true
-SaveDir = "./models/baseline"
+SaveDir = "./models/baseline/gf_lam"   # Directory to save models (in a subfolder per run)
 GpuNum = 0         # GPU index (train_wm_proposal.py needs a CUDA GPU)
-Seed = 1234        # Seeds the train/valid split and the weights (the reference checkpoint was trained unseeded)
+Seed = 2345        # Seeds the train/valid split and the weights (the reference checkpoint was trained unseeded)
 WandbName = "Input2_laminar"
 
 [data]
@@ -27,8 +30,8 @@ FS_ZPG = 1
 FS_APG = 1
 FS_FPG = 1
 
-upy = 1.25
-downy = 0.005
+upy = 0.99     # Keep n1/delta <= upy (the loader applies no window at all for upy >= 1)
+downy = 0.0025 # Keep n1/delta >= downy
 
 [data.partition]
 TrainRatio = 0.8

@@ -437,7 +437,9 @@ cannot be reproduced exactly.
 - Their `assets/` also hold the export bundles (`sngp_params.npz`, `sngp_params_meta.json`, `error_model_params.json`),
   which `tools/` reproduces (`error_model_params.json` differs only in the recorded `model_dir`, which was rewritten to the repo-relative
   `models/error/<name>` before publishing; nothing reads it).
-- The v2 training TOMLs default to `*_v2` names so that the reference models are never overwritten.
+- The v2 training TOMLs defaulted to `*_v2` names so that the reference models are never overwritten. Since
+  2026-11-08 they default to `*_gf` names ([12.3](#123-training-settings-since-2026-11-08-gf)). The `*_v2` models are
+  named `*_b4u2f` since 2026-11-03 ([12.1](#121-trainings)).
 
 ---
 
@@ -501,7 +503,7 @@ later blocks override earlier ones, and the "Rec." sections below them are histo
   `baseline_lam.toml` = `input2_laminar.toml` + `downy 0.005`; `input2_example.toml` stays at the top level for the
   parent's usage. Only `GpuNum`, `UseWandb` and `Seed` differ from the embedded configs.
 - S2: lam-turb TOMLs hold `[lam]` and `[turb]` tables; a shared `[general]` is inherited.
-- S6: explicit `ModelName` **required** (per branch); `*_v2` defaults; existing models replaced only with `Overwrite`.
+- S6: explicit `ModelName` **required** (per branch); `*_v2` defaults (now `*_gf`, [12.3](#123-training-settings-since-2026-11-08-gf)); existing models replaced only with `Overwrite`.
 - S7: `Seed` in every TOML; full metadata (`bfmwm_v2` block: config, datasets, groups, checkpoint, seed, versions) and
   `split_indices.npz` in `assets/`; legacy keys unchanged.
 - S8: class bookkeeping by name (`RemoveClasses`, `MergeGroups`, `PosthocGroups`, `DisplayNames`); unknown names,
@@ -528,14 +530,14 @@ first push so that no commit contains them; the README is cluster-neutral (venv 
   GP-covariance confidence (default `"none"` = CharLES); pinned layer names.
 - Change: per-epoch LR decay and active dropout by default (G12/G13 overridden), old behaviour as options.
 - Defaults: turbulent-only 5000 epochs; lam-turb turb branch 4000; laminar 20000 epochs, 30 classes, downsample 10,
-  recompute norm, `upy 0.8`, `downy 0`.
+  recompute norm, `upy 0.8`, `downy 0`. The gf training TOMLs differ: [12.3](#123-training-settings-since-2026-11-08-gf).
 
 **Error model**
 - Keep: best-epoch restore (optional patience), snapshots (own `SaveInterval` key), history files.
 - Drop: a-priori test metrics, vestigial features, side models, old gate variants, hierarchical training, sparse
   regularisation.
 - Defaults: turb 10000 epochs (best kept), 15×60, `upy 0.15`/`downy 0`; lam 4000 epochs, 6×60, `down0p005_up1` files,
-  `upy 1.0`/`downy 0`.
+  `upy 1.0`/`downy 0`. The gf training TOMLs differ: [12.3](#123-training-settings-since-2026-11-08-gf).
 
 **Gates, blend, EQWM, laminar law**
 - y+ of the near-wall switch from the EQWM u_τ (turbulent) or the laminar law (laminar).
@@ -840,15 +842,16 @@ sys.exit(1 if bad else 0)
 
 The default training TOMLs as of the final-review commit (`annotated-tomls`), trained on P100 GPUs (normal QOS) on 2026-10-25 with the GPU job recipe
 of the README. The `[turb]` branch of `error_lamturb.toml` has the same recipe and seed as `error_turb.toml` and was not
-trained separately. Outputs: `*_v2` models in the owner's working copy (git-ignored; `models/sngp/` and `models/error/`).
+trained separately. Outputs: `*_v2` models in the owner's working copy (git-ignored; `models/sngp/` and `models/error/`),
+named `*_b4u2f` ("before u2f") since 2026-11-03; the table and `results/compare/` use the new names.
 
 | v2 model | Recipe | Time | Result (reference in parentheses) |
 |---|---|---|---|
-| `sngp_model_turb_v2` | `sngp_turb.toml`, 5000 epochs | 60 min | val acc final 0.730 (ep5000: 0.754), best 0.805 (0.795); val loss 0.665 (0.663) |
-| `sngp_model_lamturb_turb_v2` | `sngp_lamturb.toml` `[turb]`, 4000 epochs | 49 min | val acc final 0.760 (ep4000: 0.694), best 0.784 (0.746); val loss 0.653 (0.727) |
-| `sngp_model_lam_v2` | `sngp_lamturb.toml` `[lam]`, 20000 epochs | 34 min | val acc final 0.977 (0.976); val loss 0.053 (0.051) |
-| `error_model_turb_v2` | `error_turb.toml`, 10000 epochs | 41 min | best val NLL −3.787 at epoch 4405 (−3.985 at 3811); y_mean 0.442 (0.442), y_std 34.08 (39.32) |
-| `error_model_lam_v2` | `error_lamturb.toml` `[lam]`, 4000 epochs | 8 min | best val NLL −4.736 at epoch 3998 (−4.762 at 3985); y_mean −1.059 (−1.062), y_std 10.81 (10.82) |
+| `sngp_model_turb_b4u2f` | `sngp_turb.toml`, 5000 epochs | 60 min | val acc final 0.730 (ep5000: 0.754), best 0.805 (0.795); val loss 0.665 (0.663) |
+| `sngp_model_lamturb_turb_b4u2f` | `sngp_lamturb.toml` `[turb]`, 4000 epochs | 49 min | val acc final 0.760 (ep4000: 0.694), best 0.784 (0.746); val loss 0.653 (0.727) |
+| `sngp_model_lam_b4u2f` | `sngp_lamturb.toml` `[lam]`, 20000 epochs | 34 min | val acc final 0.977 (0.976); val loss 0.053 (0.051) |
+| `error_model_turb_b4u2f` | `error_turb.toml`, 10000 epochs | 41 min | best val NLL −3.787 at epoch 4405 (−3.985 at 3811); y_mean 0.442 (0.442), y_std 34.08 (39.32) |
+| `error_model_lam_b4u2f` | `error_lamturb.toml` `[lam]`, 4000 epochs | 8 min | best val NLL −4.736 at epoch 3998 (−4.762 at 3985); y_mean −1.059 (−1.062), y_std 10.81 (10.82) |
 
 - All three SNGPs reproduce the reference class maps exactly. The v2 SNGPs use the per-epoch LR decay and active
   dropout ([4.1](#41-changed-defaults-old-behaviour-available-as-an-option)); the reference ones used neither, which
@@ -865,9 +868,9 @@ models (GPU, 20 min). The scratch files are in the owner's working copy, `result
 | Test | Models (SNGP + error model) | Baseline | Blended | Always-corrected | C mean | Fully corrected |
 |---|---|---|---|---|---|---|
 | `test_turb` (Gaussian bump 2M, 41 616 points) | reference ep4000 + ep3811 | 6.84 | 2.50 | 3.42 | 0.977 | 75.6 % |
-| | v2 `lamturb_turb` (4000) + `error_turb_v2` | 6.84 | 2.41 | 3.94 | 0.996 | 71.1 % |
+| | v2 `lamturb_turb` (4000) + `error_turb_b4u2f` | 6.84 | 2.41 | 3.94 | 0.996 | 71.1 % |
 | | reference ep5000 + ep3811 | 6.84 | 2.24 | 3.42 | 0.977 | 76.0 % |
-| | v2 `turb` (5000) + `error_turb_v2` | 6.84 | 2.35 | 3.94 | 0.998 | 71.1 % |
+| | v2 `turb` (5000) + `error_turb_b4u2f` | 6.84 | 2.35 | 3.94 | 0.998 | 71.1 % |
 | `test_lamturb` (A-airfoil 2M, C_f-filtered test file, Kt/Km threshold 0.002, 278 740 points) | reference | 43.14 (6.00) | 43.51 (4.56) | 31.16 (5.00) | 0.790 | 45.1 % |
 | | v2 | 43.14 (6.00) | 42.95 (5.05) | 38.44 (5.01) | 0.814 | 55.2 % |
 
@@ -886,3 +889,30 @@ Conclusion: the v2 pipeline reproduces the reference models within training nois
 lower, always-corrected errors slightly higher (the turbulent error model; on the A-airfoil the median is unchanged and
 the mean is driven by a few large errors), and the confidence is higher. The test TOMLs and CharLES keep the reference
 models; the v2 models are available for comparison.
+
+### 12.3 Training settings since 2026-11-08 (gf)
+
+The training TOMLs train the `*_gf` models on the global-frame data ([9.3](#93-remaining-difference-the-input-sign-frame)),
+with settings taken over from the u2-frame retraining (branch `u2f`):
+
+| Setting | Reference recipes (until 2026-11-08) | gf |
+|---|---|---|
+| n1/δ window, turbulent baseline | [0.0025, 0.15] | [0.0025, 0.15] |
+| n1/δ window, additional data of the turbulent SNGP and error model | [0, 0.15] | [0.0025, 0.15] |
+| n1/δ window, laminar baseline | none (`upy` 1.25: every Falkner-Skan point, up to 1.25) | [0.0025, 0.99] |
+| n1/δ window, additional data of the laminar SNGP / error model | [0, 0.8] / none (`upy` 1.0) | [0.0025, 0.99] |
+| Additional data of the turbulent SNGP and error model | 12 sets, including `Transition_transition` | 11 sets, without it |
+| Seed | 1234 | 2345 |
+| Error-model epoch | lowest `val_loss` | lowest 200-epoch moving average of `val_loss` (`SmoothEpochs = 200`) |
+| Names; baselines' `SaveDir` | `*_v2`; `models/baseline` | `*_gf`; `models/baseline/gf`, `models/baseline/gf_lam` |
+
+- `upy = 0.99` because both loaders treat `upy` ≥ 1 as no upper cut, and the baseline trainer then also ignores
+  `downy`. The Falkner-Skan sets have no points with 0 < n1/δ < ~0.0104, so the laminar lower bound changes nothing
+  there; the laminar A-airfoil files keep their extractions (n1/δ 0.02-0.8 and 0.005-1) until they are regenerated.
+- Seed 2345 gave the best of three global-frame retrainings with the reference recipes (all 80 benchmark datasets,
+  blended mean |e| 8.94 %; reference models 8.82 %, the other seeds 9.83 % and 9.87 %).
+- In the u2-frame retraining, dropping `Transition_transition` made the nine transition cases less accurate (blended
+  6.4 % → 10.4 %).
+- The SNGP and error TOMLs point to the reference baselines until the gf baselines are trained; then set their
+  `[baseline] Checkpoint` to the best-validation checkpoints in `models/baseline/gf/` and `models/baseline/gf_lam/`.
+- Not trained yet. The test TOMLs keep the reference models.

@@ -256,6 +256,42 @@ class SnapshotCallback(tf.keras.callbacks.Callback):
             print(f"[Snapshot] Failed to save epoch {e} to {filepath}: {ex}")
 
 
+class SmoothedBestWeights(tf.keras.callbacks.Callback):
+    """Keep the weights of the epoch where an exponential moving average of the monitored loss is lowest.
+
+    The validation NLL of the error model is spiky, so its raw minimum is close to a chance pick;
+    the EMA (span `span` epochs, alpha = 2/(span+1)) prefers epochs after which the loss stayed low.
+    Non-finite losses are skipped. The selected weights are restored at the end of training.
+    """
+
+    def __init__(self, monitor: str, span: int):
+        """
+        Args:
+            monitor: Logged quantity ('val_loss' or 'loss')
+            span: EMA span in epochs (> 0)
+        """
+        super().__init__()
+        self.monitor = monitor
+        self.alpha = 2.0 / (float(span) + 1.0)
+        self.ema = None
+        self.best = np.inf
+        self.best_epoch = 0
+        self.best_weights = None
+
+    def on_epoch_end(self, epoch, logs=None):
+        value = float((logs or {}).get(self.monitor, np.nan))
+        if not np.isfinite(value):
+            return
+        self.ema = value if self.ema is None else self.alpha * value + (1.0 - self.alpha) * self.ema
+        if self.ema < self.best:
+            self.best, self.best_epoch = self.ema, int(epoch) + 1
+            self.best_weights = self.model.get_weights()
+
+    def on_train_end(self, logs=None):
+        if self.best_weights is not None:
+            self.model.set_weights(self.best_weights)
+
+
 def lr_schedule(cfg_training: Dict[str, Any]) -> tf.keras.optimizers.schedules.PolynomialDecay:
     """Per-epoch learning-rate schedule.
 
@@ -327,6 +363,7 @@ def train_error_model(Xtr_n: np.ndarray, etr_n: np.ndarray,
     patience = int(es_cfg.get('Patience', 0))
     patience = patience if patience > 0 else epochs
     restore = bool(es_cfg.get('RestoreBestWeights', True))
+    smooth = int(es_cfg.get('SmoothEpochs', 0)) if restore else 0  # > 0: select on the EMA of the monitored loss
 
     if snapshot_dir is None and cfg.get('general', {}).get('Save', True) and 'ModelName' in cfg.get('general', {}):
         snapshot_dir = utils.snapshot_dir(cfg)
@@ -340,7 +377,7 @@ def train_error_model(Xtr_n: np.ndarray, etr_n: np.ndarray,
     print(f"  LR: {tr.get('LearningRate', 1e-3):g} -> {tr.get('EndLearningRate', 8e-5):g} "
           f"over {float(schedule.decay_steps):g} epochs (DecayFraction {tr.get('DecayFraction', 2.0 / 3.0):g}), then constant")
     print(f"  EarlyStopping: monitor={monitor}, patience={patience}, min_delta={float(es_cfg.get('MinDelta', 0.0)):g}, "
-          f"restore_best_weights={restore}")
+          f"restore_best_weights={restore}" + (f", selection on the {smooth}-epoch EMA of {monitor}" if smooth else ""))
     print(f"  Snapshots: " + (f"every {snapshot.interval} epochs to {snapshot_dir}" if snapshot.enabled else "off"))
     print('=' * 80)
 
@@ -350,9 +387,12 @@ def train_error_model(Xtr_n: np.ndarray, etr_n: np.ndarray,
     early = tf.keras.callbacks.EarlyStopping(
         monitor=monitor, mode='min', patience=patience,
         min_delta=float(es_cfg.get('MinDelta', 0.0)),
-        restore_best_weights=restore, verbose=1,
+        restore_best_weights=restore and not smooth, verbose=1,
     )
     callbacks = [tf.keras.callbacks.LearningRateScheduler(lambda e, lr: float(schedule(e))), early]
+    smoothed = SmoothedBestWeights(monitor, smooth) if smooth else None
+    if smoothed is not None:
+        callbacks.append(smoothed)
     if snapshot.enabled:
         callbacks.append(snapshot)
 
@@ -364,9 +404,11 @@ def train_error_model(Xtr_n: np.ndarray, etr_n: np.ndarray,
     if 'lr' not in history:
         history['lr'] = [float(schedule(e)) for e in range(epochs_run)]
     # EarlyStopping.best_epoch is the 0-based index of the best monitored epoch
-    best_epoch = int(early.best_epoch) + 1
+    best_epoch = smoothed.best_epoch if smoothed is not None else int(early.best_epoch) + 1
     best_val = history.get(monitor, [float('nan')])[best_epoch - 1] if epochs_run else float('nan')
-    print(f"Error model: {epochs_run} epochs run, best {monitor} {best_val:.6g} at epoch {best_epoch}"
+    print(f"Error model: {epochs_run} epochs run, " + (f"lowest {smooth}-epoch EMA of {monitor} {smoothed.best:.6g} "
+          f"({monitor} {best_val:.6g}) at epoch {best_epoch}" if smoothed is not None
+          else f"best {monitor} {best_val:.6g} at epoch {best_epoch}")
           + (" (weights restored)" if restore else " (last-epoch weights kept)"))
     return model, history, best_epoch
 
@@ -587,6 +629,7 @@ def error_metadata(cfg: Dict[str, Any], *, baseline_checkpoint: str, add_dataset
             'RestoreBestWeights': bool(es.get('RestoreBestWeights', True)),
             'Patience': int(es.get('Patience', 0)),
             'MinDelta': float(es.get('MinDelta', 0.0)),
+            'SmoothEpochs': int(es.get('SmoothEpochs', 0)),
             'SaveInterval': int(tr.get('Snapshots', {}).get('SaveInterval', 0)),
         },
         'best_epoch': int(best_epoch),

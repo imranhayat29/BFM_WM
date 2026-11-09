@@ -176,7 +176,8 @@ python train_turb.py --sngp sngp/sngp_turb.toml --error error/error_turb.toml --
     `training_history.json`, `val_loss.csv` and `split_indices.npz`. Periodic snapshots go to
     `<SaveDir>/checkpoints/<ModelName>/`.
 - Diagnostics (confusion matrices, class counts, training histories) go to `results/training/<ModelName>/`.
-- The error model keeps the weights of its best validation epoch. The reference turbulent error model
+- The error model keeps the weights of its best validation epoch, or with `SmoothEpochs` > 0 those of the epoch
+  with the lowest moving average of the validation loss. The reference turbulent error model
   `…_ep3811` is the best epoch of a 10000-epoch run.
 
 ### 3. A-priori testing
@@ -398,7 +399,7 @@ shared top-level `[general]` table are inherited by the branches that do not set
 | `[model]`, SNGP | `NumLayers` (`6`), `NumHidden` (`128`), `SpecNormBound` (`0.9`), `NumInducing` (`1024`), `GpKernelScale` (`1.0`), `Dropout` (`0.1`), `DropoutActive` (`true`) |
 | `[training]`, SNGP | `Epochs` (required), `BatchSize` (`50000`), `LearningRate` (`5e-4`) linearly to `EndLearningRate` (`1e-4`), `DecayUnit` (`"epoch"`), `ClassWeights` (`"balanced"` or `"none"`) |
 | `[model]`, error model | `HiddenLayers` (required, e.g. 15 × 60), `SigmaFloor` (`1e-4`) |
-| `[training]`, error model | `Epochs` (required), `BatchSize` (`50000`), `LearningRate` (`1e-3`) linearly to `EndLearningRate` (`8e-5`) over the first `DecayFraction` (`2/3`) of the epochs; `[training.EarlyStopping]` `RestoreBestWeights` (`true`), `Patience` (`0` = never stop early), `MinDelta` (`0.0`); `[training.Snapshots]` `SaveInterval` (`1000`; `0` = off) |
+| `[training]`, error model | `Epochs` (required), `BatchSize` (`50000`), `LearningRate` (`1e-3`) linearly to `EndLearningRate` (`8e-5`) over the first `DecayFraction` (`2/3`) of the epochs; `[training.EarlyStopping]` `RestoreBestWeights` (`true`), `Patience` (`0` = never stop early), `MinDelta` (`0.0`), `SmoothEpochs` (`0`; > 0: select the epoch on the exponential moving average of `val_loss` over that many epochs); `[training.Snapshots]` `SaveInterval` (`1000`; `0` = off) |
 
 Two SNGP options select between the current training and the one of the reference SNGPs:
 - `DecayUnit = "epoch"` decays the learning rate over all epochs; `"step"` counts optimiser steps instead,

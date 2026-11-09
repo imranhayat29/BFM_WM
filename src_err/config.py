@@ -193,6 +193,7 @@ def error_schema() -> Dict[str, Any]:
                 "RestoreBestWeights": Key("bool", True),
                 "Patience": Key("int", 0, check=_non_negative),
                 "MinDelta": Key("float", 0.0, check=_non_negative),
+                "SmoothEpochs": Key("int", 0, check=_non_negative),  # > 0: restore the weights at the lowest EMA of val_loss
             },
             "Snapshots": {
                 "SaveInterval": Key("int", 1000),

@@ -586,6 +586,11 @@ installation is needed for them. The scripts of this repository do not need LaTe
     forward or backward relative to the global flow. The sign of $\tau_w$ is assigned after the prediction,
     from the global direction of $u_1$.
 
+- **Reduce SNGP parameters.** Currently network seems too large for a 3-D input space. Goal is to reduce training and inference time by reducing hyperparameters while achieving comparable accuracy.
+  - Need to decide where the model-size reduction can be achieved: E.g., in the ResNet layers or the downstream Gaussian Process layer. For this, need to determine which part is most expensive.
+  - Are any other unused parts of network responsible for expensive training/testing? E.g., the covariance.
+  - Any other operations outside network that might add to expense at inference? 
+
 ## Development notes
 
 The history of the code, the design decisions, and the provenance of the data and the reference models are
